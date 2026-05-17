@@ -1,0 +1,1688 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>3DM Lampe</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#F5F4F0;--surface:#FFFFFF;--surface2:#EEEDEA;--surface3:#E4E3DF;
+  --text:#181816;--text2:#6A6965;--text3:#AEADA8;
+  --border:rgba(0,0,0,0.08);--border2:rgba(0,0,0,0.14);
+  --green:#1A9268;--green-bg:#E3F5EE;--green-dark:#0A4A34;--green-mid:#0F6E50;
+  --red:#C94F2E;--red-bg:#FAECEA;--red-dark:#4A1A0C;
+  --warn:#B07015;--warn-bg:#FBF0DC;--warn-dark:#3D2600;
+  --blue:#2E7DD4;--blue-bg:#E8F2FB;--blue-dark:#062850;
+  --r:12px;--rs:8px;--rxs:6px;
+  --shadow:0 1px 3px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04);
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:80px;font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+
+/* BOTTOM NAV */
+.nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:0.5px solid var(--border2);display:flex;z-index:100;padding:8px 0 max(12px,env(safe-area-inset-bottom,12px))}
+.nb{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;color:var(--text3);font-size:10px;font-weight:500;cursor:pointer;padding:4px 2px;transition:color .15s;letter-spacing:.02em;font-family:'DM Sans',sans-serif}
+.nb svg{width:22px;height:22px;stroke-width:1.7}
+.nb.on{color:var(--green)}
+
+/* SCREENS */
+.screen{display:none;padding:16px 16px 8px;max-width:500px;margin:0 auto}
+.screen.on{display:block}
+
+/* PAGE HEADER */
+.ph{padding:14px 0 18px;display:flex;align-items:flex-start;justify-content:space-between}
+.ph-title{font-size:24px;font-weight:700;letter-spacing:-.4px;line-height:1.2}
+.ph-sub{font-size:13px;color:var(--text2);margin-top:3px}
+
+/* STAT GRID */
+.stats2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.stat-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow)}
+.stat-lbl{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px}
+.stat-num{font-size:26px;font-weight:700;letter-spacing:-.6px;line-height:1}
+.stat-num small{font-size:14px;font-weight:500;color:var(--text2);letter-spacing:0}
+.stat-num.green{color:var(--green)}
+.stat-num.red{color:var(--red)}
+.stat-num.warn{color:var(--warn)}
+.stat-num.blue{color:var(--blue)}
+.stat-sub{font-size:12px;color:var(--text2);margin-top:5px}
+
+/* CARD */
+.card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:12px;box-shadow:var(--shadow)}
+.card-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.card-title{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em}
+
+/* ALERT BANNER */
+.alert{border-radius:var(--rs);padding:11px 14px;margin-bottom:9px;font-size:13px;display:flex;align-items:flex-start;gap:10px;line-height:1.5}
+.alert svg{width:15px;height:15px;flex-shrink:0;margin-top:1px;stroke-width:2}
+.alert.danger{background:var(--red-bg);color:var(--red-dark)}
+.alert.warn{background:var(--warn-bg);color:var(--warn-dark)}
+.alert.ok{background:var(--green-bg);color:var(--green-dark)}
+.alert.info{background:var(--blue-bg);color:var(--blue-dark)}
+.alert strong{font-weight:600}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:10px 18px;border-radius:var(--rs);border:0.5px solid var(--border2);background:var(--surface);color:var(--text);font-size:14px;font-weight:500;cursor:pointer;transition:background .12s,transform .08s,box-shadow .12s;user-select:none;font-family:'DM Sans',sans-serif;box-shadow:var(--shadow)}
+.btn:active{transform:scale(.97)}
+.btn:hover{background:var(--surface2)}
+.btn.primary{background:var(--green);color:#fff;border-color:var(--green-mid)}
+.btn.primary:hover{background:var(--green-mid)}
+.btn.ghost{background:transparent;border-color:transparent;box-shadow:none;color:var(--text2)}
+.btn.ghost:hover{background:var(--surface2)}
+.btn.sm{padding:7px 13px;font-size:13px}
+.btn.xs{padding:5px 10px;font-size:12px}
+.btn.full{width:100%}
+.btn.danger-btn{background:var(--red);color:#fff;border-color:var(--red)}
+.btn svg{width:15px;height:15px;stroke-width:2;flex-shrink:0}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.row-btns{display:flex;gap:10px}
+.row-btns .btn{flex:1}
+
+/* ORDER CARD */
+.ord-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);margin-bottom:10px;overflow:hidden;box-shadow:var(--shadow)}
+.ord-head{padding:14px 16px 10px;display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.ord-name{font-weight:600;font-size:15px}
+.ord-meta{font-size:12px;color:var(--text2);margin-top:2px}
+.ord-body{padding:0 16px 14px}
+.ord-item-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:0.5px solid var(--border)}
+.ord-item-row:last-child{border-bottom:none}
+.ord-item-name{font-size:13px;color:var(--text2)}
+.ord-item-qty{font-size:13px;font-weight:600}
+.ord-status-bar{padding:10px 16px;background:var(--surface2);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ord-status-info{font-size:12px;color:var(--text2)}
+
+/* BADGE */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.badge.green{background:var(--green-bg);color:var(--green-dark)}
+.badge.red{background:var(--red-bg);color:var(--red-dark)}
+.badge.warn{background:var(--warn-bg);color:var(--warn-dark)}
+.badge.blue{background:var(--blue-bg);color:var(--blue-dark)}
+.badge.gray{background:var(--surface2);color:var(--text2)}
+.badge svg{width:11px;height:11px;stroke-width:2.5}
+
+/* FORM */
+.fg{margin-bottom:15px}
+.fg label{font-size:13px;color:var(--text2);margin-bottom:6px;display:block;font-weight:500}
+.fi{width:100%;padding:10px 13px;border:0.5px solid var(--border2);border-radius:var(--rs);background:var(--surface);color:var(--text);font-size:15px;font-family:'DM Sans',sans-serif;transition:border-color .15s}
+.fi:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(26,146,104,.1)}
+select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236A6965' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:36px;cursor:pointer}
+.fi-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fi-note{font-size:12px;color:var(--text3);margin-top:5px}
+
+/* MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:flex-end;padding:0;backdrop-filter:blur(2px)}
+.overlay.on{display:flex}
+.modal{background:var(--surface);border-radius:20px 20px 0 0;width:100%;max-width:500px;margin:0 auto;padding:20px 20px max(24px,env(safe-area-inset-bottom,24px));max-height:90vh;overflow-y:auto}
+.modal-bar{width:32px;height:4px;background:var(--surface3);border-radius:2px;margin:0 auto 20px}
+.modal h2{font-size:18px;font-weight:700;margin-bottom:20px;letter-spacing:-.2px}
+.modal-btns{display:flex;gap:10px;margin-top:18px}
+.modal-btns .btn{flex:1}
+.modal-section{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:18px 0 12px}
+
+/* LAGER ROWS */
+.lager-section{margin-bottom:6px}
+.lager-sec-title{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;padding:14px 0 8px}
+.comp-row{display:flex;align-items:center;padding:12px 0;border-bottom:0.5px solid var(--border);gap:12px}
+.comp-row:last-child{border-bottom:none}
+.comp-icon{width:36px;height:36px;border-radius:var(--rxs);background:var(--surface2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.comp-icon svg{width:18px;height:18px;stroke-width:1.8;color:var(--text2)}
+.comp-left{flex:1;min-width:0}
+.comp-name{font-size:14px;font-weight:500}
+.comp-detail{font-size:12px;color:var(--text2);margin-top:1px}
+.comp-right{text-align:right;flex-shrink:0}
+.comp-qty{font-size:22px;font-weight:700;font-family:'DM Mono',monospace;letter-spacing:-.5px;line-height:1}
+.comp-unit{font-size:11px;color:var(--text3);margin-top:1px}
+.comp-low{color:var(--red)}
+.comp-warn{color:var(--warn)}
+.comp-ok{color:var(--green)}
+
+/* PRODUCTION FLOW */
+.flow-row{display:flex;align-items:center;padding:11px 0;border-bottom:0.5px solid var(--border);gap:12px}
+.flow-row:last-child{border-bottom:none}
+.flow-phase{flex:1}
+.flow-name{font-size:14px;font-weight:500}
+.flow-sub{font-size:12px;color:var(--text2);margin-top:2px}
+.flow-count{font-size:28px;font-weight:700;font-family:'DM Mono',monospace;letter-spacing:-1px;min-width:48px;text-align:right}
+.flow-btns{display:flex;gap:6px;margin-left:8px}
+
+/* PROGRESS BAR */
+.prog{height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;margin-top:8px}
+.prog-fill{height:100%;border-radius:2px;transition:width .4s ease}
+.prog-fill.green{background:var(--green)}
+.prog-fill.warn{background:var(--warn)}
+.prog-fill.red{background:var(--red)}
+
+/* FINANCE TABLE */
+.fin-table{width:100%;border-collapse:collapse;font-size:13px}
+.fin-table th{text-align:left;padding:8px 10px;color:var(--text2);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border2)}
+.fin-table td{padding:10px 10px;border-bottom:0.5px solid var(--border);vertical-align:middle}
+.fin-table tr:last-child td{border-bottom:none}
+.fin-table .num{text-align:right;font-family:'DM Mono',monospace;font-weight:500}
+.fin-table tfoot td{font-weight:700;border-top:1px solid var(--border2);border-bottom:none;background:var(--surface2);font-size:14px}
+
+/* MONTH NAV */
+.month-nav{display:flex;align-items:center;gap:8px;margin-bottom:16px}
+.month-nav h2{flex:1;text-align:center;font-size:16px;font-weight:600}
+
+/* SECTION LABEL */
+.sec-lbl{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:20px 0 10px}
+
+/* DIVIDER */
+.div{height:0.5px;background:var(--border);margin:14px 0}
+
+/* COST ROW */
+.cost-row{display:flex;align-items:center;padding:10px 0;border-bottom:0.5px solid var(--border);gap:10px}
+.cost-row:last-child{border-bottom:none}
+.cost-left{flex:1;min-width:0}
+.cost-name{font-size:14px;font-weight:500}
+.cost-date{font-size:12px;color:var(--text3);margin-top:1px}
+.cost-amt{font-size:16px;font-weight:700;font-family:'DM Mono',monospace;color:var(--red);flex-shrink:0}
+.cost-badge-wrap{margin-right:8px}
+
+/* TABS */
+.tabs{display:flex;gap:6px;margin-bottom:16px;background:var(--surface2);padding:4px;border-radius:var(--rs)}
+.tab{flex:1;padding:8px;border:none;background:transparent;border-radius:var(--rxs);font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
+.tab.on{background:var(--surface);color:var(--text);box-shadow:var(--shadow)}
+
+/* EMPTY STATE */
+.empty{text-align:center;padding:48px 20px;color:var(--text3)}
+.empty svg{width:44px;height:44px;stroke-width:1.2;margin:0 auto 14px;display:block}
+.empty p{font-size:14px}
+
+/* SETUP SCREEN */
+.setup-wrap{min-height:80vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px 20px;text-align:center}
+.setup-logo{width:64px;height:64px;background:var(--green);border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px}
+.setup-logo svg{width:32px;height:32px;stroke:white;stroke-width:1.8}
+.setup-title{font-size:26px;font-weight:700;letter-spacing:-.4px;margin-bottom:8px}
+.setup-sub{font-size:15px;color:var(--text2);line-height:1.6;margin-bottom:30px}
+
+/* CHIP */
+.chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:500;background:var(--surface2);color:var(--text2);border:0.5px solid var(--border)}
+
+/* TOAST */
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-80px);background:var(--text);color:var(--surface);padding:11px 20px;border-radius:var(--rs);font-size:13px;font-weight:500;z-index:999;transition:transform .3s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.25)}
+.toast.show{transform:translateX(-50%) translateY(0)}
+
+/* SPINNER */
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:white;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* SWITCH */
+.switch-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0}
+.switch-label{font-size:14px;font-weight:500}
+.switch-sub{font-size:12px;color:var(--text2);margin-top:2px}
+.switch{width:46px;height:26px;background:var(--surface3);border-radius:13px;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0;border:none}
+.switch.on{background:var(--green)}
+.switch::after{content:'';position:absolute;width:20px;height:20px;background:white;border-radius:50%;top:3px;left:3px;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.switch.on::after{transform:translateX(20px)}
+
+/* PROFIT HIGHLIGHT */
+.profit-big{background:var(--green-bg);border-radius:var(--r);padding:18px 20px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+.profit-big-lbl{font-size:12px;font-weight:700;color:var(--green-dark);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px}
+.profit-big-val{font-size:32px;font-weight:700;color:var(--green);letter-spacing:-1px;font-family:'DM Mono',monospace}
+
+/* REKL ROW */
+.rekl-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:0.5px solid var(--border)}
+.rekl-row:last-child{border-bottom:none}
+.rekl-date{font-size:14px;font-weight:500}
+.rekl-amt{font-size:15px;font-weight:700;font-family:'DM Mono',monospace;color:var(--red)}
+
+/* PRODUCT SETTINGS */
+.prod-set-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);margin-bottom:10px;overflow:hidden}
+.prod-set-head{padding:14px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer}
+.prod-set-name{font-weight:600;font-size:15px}
+.prod-set-body{padding:0 16px 16px;border-top:0.5px solid var(--border)}
+
+/* ANIMATION */
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.screen.on{animation:fadeIn .2s ease}
+</style>
+</head>
+<body>
+
+<div id="toast" class="toast"></div>
+
+<!-- SCREEN: DASHBOARD -->
+<div id="s-dash" class="screen on">
+  <div class="ph">
+    <div>
+      <div class="ph-title">3DM Lampe</div>
+      <div class="ph-sub" id="dash-date">—</div>
+    </div>
+    <button class="btn sm" id="sync-btn" onclick="doSync()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+      Sync
+    </button>
+  </div>
+  <div id="dash-alerts"></div>
+  <div class="stats2" id="dash-stats"></div>
+  <div class="sec-lbl">Čeka obradu</div>
+  <div id="dash-orders"></div>
+  <div class="sec-lbl">Lager — brzo</div>
+  <div id="dash-lager-quick"></div>
+</div>
+
+<!-- SCREEN: NARUDŽBINE -->
+<div id="s-ord" class="screen">
+  <div class="ph">
+    <div>
+      <div class="ph-title">Narudžbine</div>
+      <div class="ph-sub" id="ord-sub">—</div>
+    </div>
+    <button class="btn sm primary" onclick="openModal('m-add-ord')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Nova
+    </button>
+  </div>
+  <div class="tabs">
+    <button class="tab on" onclick="filterOrds('pending',this)">Na čekanju</button>
+    <button class="tab" onclick="filterOrds('ready',this)">Spremno</button>
+    <button class="tab" onclick="filterOrds('all',this)">Sve</button>
+  </div>
+  <div id="ord-list"></div>
+</div>
+
+<!-- SCREEN: LAGER -->
+<div id="s-lag" class="screen">
+  <div class="ph">
+    <div>
+      <div class="ph-title">Lager</div>
+      <div class="ph-sub">Zalihe i produkcija</div>
+    </div>
+    <button class="btn sm primary" onclick="openModal('m-add-comp')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Dodaj
+    </button>
+  </div>
+  <div class="tabs">
+    <button class="tab on" onclick="lagTab('comp',this)">Komponente</button>
+    <button class="tab" onclick="lagTab('prod',this)">Produkcija</button>
+  </div>
+  <div id="lag-comp"></div>
+  <div id="lag-prod" style="display:none"></div>
+</div>
+
+<!-- SCREEN: FINANSIJE -->
+<div id="s-fin" class="screen">
+  <div class="ph">
+    <div>
+      <div class="ph-title">Finansije</div>
+    </div>
+    <button class="btn sm" onclick="exportCSV()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export
+    </button>
+  </div>
+  <div class="month-nav">
+    <button class="btn sm ghost" onclick="changeMonth(-1)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <h2 id="fin-month-lbl">—</h2>
+    <button class="btn sm ghost" onclick="changeMonth(1)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
+  </div>
+  <div id="fin-body"></div>
+</div>
+
+<!-- SCREEN: PODEŠAVANJA -->
+<div id="s-set" class="screen">
+  <div class="ph">
+    <div><div class="ph-title">Podešavanja</div></div>
+  </div>
+
+  <div class="sec-lbl">Shopify</div>
+  <div class="card">
+    <div class="fg"><label>Shop URL (bez https://)</label><input class="fi" id="set-shop-url" placeholder="moja-prodavnica.myshopify.com"></div>
+    <div class="fg"><label>Admin API Access Token</label><input class="fi" id="set-shop-token" type="password" placeholder="shpat_..."></div>
+    <button class="btn primary full" onclick="saveShopify()">Sačuvaj Shopify</button>
+  </div>
+
+  <div class="sec-lbl">Meta Ads</div>
+  <div class="card">
+    <div class="fg"><label>Access Token</label><input class="fi" id="set-meta-token" type="password" placeholder="EAAd..."></div>
+    <div class="fg"><label>Ad Account ID</label><input class="fi" id="set-meta-account" placeholder="act_123456789"></div>
+    <div class="switch-row">
+      <div><div class="switch-label">Auto povlačenje u 23:50</div><div class="switch-sub">Svaki dan automatski</div></div>
+      <button class="switch" id="meta-auto-switch" onclick="toggleMetaAuto()"></button>
+    </div>
+    <button class="btn primary full" style="margin-top:12px" onclick="saveMetaConfig()">Sačuvaj Meta Config</button>
+  </div>
+
+  <div class="sec-lbl">Globalna podešavanja</div>
+  <div class="card">
+    <div class="fg"><label>Cena filamenta (RSD/kg)</label><input class="fi" id="set-filament" type="number" placeholder="2000"></div>
+    <div class="fg"><label>Fiksna poštarina po paketu (RSD)</label><input class="fi" id="set-postarina" type="number" placeholder="390"></div>
+    <button class="btn primary full" onclick="saveGlobal()">Sačuvaj</button>
+  </div>
+
+  <div class="sec-lbl">Proizvodi</div>
+  <div id="prod-settings-list"></div>
+  <button class="btn full" style="margin-bottom:12px" onclick="openModal('m-add-prod')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Dodaj novi proizvod
+  </button>
+
+  <div class="sec-lbl">Limit upozorenja po komponentama</div>
+  <div id="comp-limits-list"></div>
+
+  <div class="sec-lbl">Podaci</div>
+  <div class="card">
+    <button class="btn full" style="margin-bottom:10px" onclick="exportAll()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export svih podataka (JSON)
+    </button>
+    <label class="btn full" style="margin-bottom:10px;cursor:pointer">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Import podataka (JSON)
+      <input type="file" accept=".json" style="display:none" onchange="importAll(event)">
+    </label>
+  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="nav">
+  <button class="nb on" id="nb-dash" onclick="goTo('dash')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    Pregled
+  </button>
+  <button class="nb" id="nb-ord" onclick="goTo('ord')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+    Narudžbine
+  </button>
+  <button class="nb" id="nb-lag" onclick="goTo('lag')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+    Lager
+  </button>
+  <button class="nb" id="nb-fin" onclick="goTo('fin')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    Finansije
+  </button>
+  <button class="nb" id="nb-set" onclick="goTo('set')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    Podešavanja
+  </button>
+</nav>
+
+<!-- MODALS -->
+
+<!-- ADD ORDER -->
+<div id="m-add-ord" class="overlay">
+  <div class="modal">
+    <div class="modal-bar"></div>
+    <h2>Nova narudžbina</h2>
+    <div class="fg"><label>Shopify broj narudžbine</label><input class="fi" id="ord-shopify-id" placeholder="#1234"></div>
+    <div class="fg"><label>Kupac (opciono)</label><input class="fi" id="ord-customer" placeholder="Ime ili grad"></div>
+    <div id="ord-items-wrap">
+      <div class="modal-section">Stavke</div>
+      <div id="ord-items-list"></div>
+      <button class="btn full ghost" style="margin-top:8px" onclick="addOrdItem()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Dodaj stavku
+      </button>
+    </div>
+    <div class="fg" style="margin-top:14px"><label>Ukupna cena (RSD) — iz Shopify</label><input class="fi" id="ord-total" type="number" placeholder="2890"></div>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeModal('m-add-ord')">Otkaži</button>
+      <button class="btn primary" onclick="saveOrder()">Dodaj narudžbinu</button>
+    </div>
+  </div>
+</div>
+
+<!-- ORDER ACTION -->
+<div id="m-ord-action" class="overlay">
+  <div class="modal">
+    <div class="modal-bar"></div>
+    <h2 id="m-ord-action-title">Narudžbina</h2>
+    <div id="m-ord-action-body"></div>
+    <div class="modal-btns" id="m-ord-action-btns"></div>
+  </div>
+</div>
+
+<!-- SKLAPANJE -->
+<div id="m-sklop" class="overlay">
+  <div class="modal">
+    <div class="modal-bar"></div>
+    <h2 id="m-sklop-title">Sklopiti kutiju</h2>
+    <div id="m-sklop-body"></div>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeModal('m-sklop')">Otkaži</button>
+      <button class="btn primary" id="m-sklop-confirm" onclick="confirmSklop()">Potvrdi</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD COMPONENT -->
+<div id="m-add-comp" class="overlay">
+  <div class="modal">
+    <div class="modal-bar"></div>
+    <h2>Dodaj na lager</h2>
+    <div class="fg">
+      <label>Komponenta</label>
+      <select class="fi" id="comp-select" onchange="onCompSelect()">
+        <option value="">— Izaberi —</option>
+        <option value="lica">Lica (štampana)</option>
+        <option value="kutije_stamp">Kutije štampane (3D)</option>
+        <option value="usb">USB kablovi</option>
+        <option value="led">LED traka</option>
+        <option value="karton">Kutije za pakovanje (karton)</option>
+        <option value="sklopljene">Sklopljene kutije (bez lica)</option>
+        <option value="gotove">Gotove lampe</option>
+      </select>
+    </div>
+    <div class="fg" id="comp-prod-wrap" style="display:none">
+      <label>Proizvod</label>
+      <select class="fi" id="comp-prod-select"></select>
+    </div>
+    <div class="fg"><label>Količina <span id="comp-unit-lbl">(kom)</span></label><input class="fi" id="comp-qty" type="number" placeholder="10" min="0" step="0.1"></div>
+    <div class="fg"><label>Cena (RSD) — opciono za rashode</label><input class="fi" id="comp-price" type="number" placeholder="0"></div>
+    <div id="comp-deduct-info" class="alert info" style="display:none;margin-top:8px"></div>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeModal('m-add-comp')">Otkaži</button>
+      <button class="btn primary" onclick="saveComp()">Dodaj</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD PRODUCT -->
+<div id="m-add-prod" class="overlay">
+  <div class="modal">
+    <div class="modal-bar"></div>
+    <h2 id="m-prod-title">Novi proizvod</h2>
+    <div class="fg"><label>Naziv</label><input class="fi" id="prod-name" placeholder="Lampa Partizan"></div>
+    <div class="fg"><label>Shopify Product ID (opciono)</label><input class="fi" id="prod-shopify-id" placeholder="8123456789"></div>
+    <div class="fg"><label>Cena prodaje (RSD) — bez poštarine</label><input class="fi" id="prod-price" type="number" placeholder="2500"></div>
+    <div class="modal-section">Potrošnja materijala po lampi</div>
+    <div class="fi-row">
+      <div class="fg"><label>Filament kutija (g)</label><input class="fi" id="prod-fg-kut" type="number" placeholder="150"></div>
+      <div class="fg"><label>Filament lice (g)</label><input class="fi" id="prod-fg-lice" type="number" placeholder="50"></div>
+    </div>
+    <div class="fi-row">
+      <div class="fg"><label>LED traka (m)</label><input class="fi" id="prod-led" type="number" placeholder="1" step="0.1"></div>
+      <div class="fg"><label>USB kablovi (kom)</label><input class="fi" id="prod-usb" type="number" placeholder="1"></div>
+    </div>
+    <div class="fg"><label>Ostali troškovi (RSD/kom)</label><input class="fi" id="prod-other" type="number" placeholder="0"><div class="fi-note">Sve ostalo što nije automatski izračunato</div></div>
+    <input type="hidden" id="prod-edit-id">
+    <div class="modal-btns">
+      <button class="btn" onclick="closeModal('m-add-prod')">Otkaži</button>
+      <button class="btn primary" onclick="saveProd()">Sačuvaj</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD COST -->
+<div id="m-add-cost" class="overlay">
+  <div class="modal">
+    <div class="modal-bar"></div>
+    <h2>Unesi rashod</h2>
+    <div class="fg">
+      <label>Kategorija</label>
+      <select class="fi" id="cost-cat">
+        <option value="reklame">Reklame (Meta)</option>
+        <option value="filament">Filament</option>
+        <option value="material">Materijal</option>
+        <option value="postarina_faktura">Poštarina — faktura</option>
+        <option value="shopify">Shopify pretplata</option>
+        <option value="ostalo">Ostalo</option>
+      </select>
+    </div>
+    <div class="fg"><label>Opis</label><input class="fi" id="cost-desc" placeholder="npr. Meta Ads 15.05"></div>
+    <div class="fg"><label>Iznos (RSD)</label><input class="fi" id="cost-amt" type="number" placeholder="5000"></div>
+    <div class="fg"><label>Datum</label><input class="fi" id="cost-date" type="date"></div>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeModal('m-add-cost')">Otkaži</button>
+      <button class="btn primary" onclick="saveCost()">Dodaj</button>
+    </div>
+  </div>
+</div>
+
+<!-- META REKLAME -->
+<div id="m-meta" class="overlay">
+  <div class="modal">
+    <div class="modal-bar"></div>
+    <h2>Reklame danas</h2>
+    <div id="m-meta-body"></div>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeModal('m-meta')">Zatvori</button>
+      <button class="btn primary" onclick="pullMetaToday()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+        Povuci sa Meta
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================== STATE =====================
+let DB = {
+  orders: [],       // {id, shopifyId, customer, items:[{productId,qty}], total, status, createdAt, fulfilledAt}
+  lager: {          // po proizvodu
+    lica: {},       // {productId: qty}
+    kutije_stamp: {},
+    sklopljene: {},
+    gotove: {},
+    usb: 0,
+    led: 0,
+    karton: 0
+  },
+  products: [],     // {id, name, shopifyId, price, filament_kut, filament_lice, led, usb, other_cost}
+  costs: [],        // {id, cat, desc, amount, date}
+  reklame: [],      // {date:'YYYY-MM-DD', amount}
+  settings: {
+    shopUrl: '', shopToken: '',
+    metaToken: '', metaAccount: '',
+    metaAuto: false,
+    filamentPrice: 2000,
+    postarina: 390
+  },
+  compLimits: {     // {key: qty}
+    usb: 20, led: 20, karton: 10,
+    lica: {}, kutije_stamp: {}, sklopljene: {}, gotove: {}
+  }
+};
+
+let currentScreen = 'dash';
+let currentFinMonth = new Date().getMonth();
+let currentFinYear = new Date().getFullYear();
+let ordFilter = 'pending';
+let lagTabCurrent = 'comp';
+let sklopAction = null;
+
+// ===================== PERSISTENCE =====================
+function save(){localStorage.setItem('3dm_db', JSON.stringify(DB));}
+function load(){
+  const d = localStorage.getItem('3dm_db');
+  if(d){try{DB = JSON.parse(d);}catch(e){}}
+  // Ensure structure
+  if(!DB.lager.lica) DB.lager.lica = {};
+  if(!DB.lager.kutije_stamp) DB.lager.kutije_stamp = {};
+  if(!DB.lager.sklopljene) DB.lager.sklopljene = {};
+  if(!DB.lager.gotove) DB.lager.gotove = {};
+  if(typeof DB.lager.usb !== 'number') DB.lager.usb = 0;
+  if(typeof DB.lager.led !== 'number') DB.lager.led = 0;
+  if(typeof DB.lager.karton !== 'number') DB.lager.karton = 0;
+  if(!DB.reklame) DB.reklame = [];
+  if(!DB.compLimits) DB.compLimits = {usb:20,led:20,karton:10,lica:{},kutije_stamp:{},sklopljene:{},gotove:{}};
+}
+
+// ===================== NAV =====================
+function goTo(screen){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
+  document.getElementById('s-'+screen).classList.add('on');
+  document.getElementById('nb-'+screen).classList.add('on');
+  currentScreen = screen;
+  if(screen==='dash') renderDash();
+  if(screen==='ord') renderOrds();
+  if(screen==='lag') renderLag();
+  if(screen==='fin') renderFin();
+  if(screen==='set') renderSet();
+}
+
+// ===================== MODALS =====================
+function openModal(id){document.getElementById(id).classList.add('on');}
+function closeModal(id){document.getElementById(id).classList.remove('on');}
+document.querySelectorAll('.overlay').forEach(o=>{
+  o.addEventListener('click',e=>{if(e.target===o) o.classList.remove('on');});
+});
+
+// ===================== TOAST =====================
+function toast(msg, duration=2400){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), duration);
+}
+
+// ===================== HELPERS =====================
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
+function fmt(n){return Math.round(n).toLocaleString('sr-RS');}
+function fmtDate(iso){
+  const d = new Date(iso);
+  return d.toLocaleDateString('sr-RS',{day:'numeric',month:'short'});
+}
+function today(){return new Date().toISOString().slice(0,10);}
+function monthKey(y,m){return y+'-'+String(m+1).padStart(2,'0');}
+
+function getProdById(id){return DB.products.find(p=>p.id===id);}
+
+function calcCostPerLamp(prod){
+  if(!prod) return 0;
+  const s = DB.settings;
+  const filCost = (((prod.filament_kut||0)+(prod.filament_lice||0))/1000)*(s.filamentPrice||2000);
+  // USB cost per unit
+  const usbCostItem = DB.costs.filter(c=>c.cat==='material'&&c.desc&&c.desc.toLowerCase().includes('usb'));
+  // Simple: use lager average or 0 — we track via costs
+  const lampCost = filCost + (prod.other_cost||0);
+  return lampCost;
+}
+
+function calcProfitPerOrder(order){
+  const s = DB.settings;
+  const postarina = s.postarina||390;
+  let profit = 0;
+  const total = order.total||0;
+  // prihod = total (šta kupac plati)
+  // cena lampi = total - postarina
+  const lampRevenue = total - postarina;
+  // oduzmi troškove po svakoj stavci
+  let matCost = 0;
+  (order.items||[]).forEach(it=>{
+    const p = getProdById(it.productId);
+    if(p) matCost += calcCostPerLamp(p) * (it.qty||1);
+  });
+  profit = lampRevenue - matCost;
+  return {profit, prihod: total, matCost, postarina};
+}
+
+// ===================== LAGER HELPERS =====================
+function getLagerQty(type, prodId){
+  if(type==='usb') return DB.lager.usb||0;
+  if(type==='led') return DB.lager.led||0;
+  if(type==='karton') return DB.lager.karton||0;
+  const map = DB.lager[type]||{};
+  if(prodId) return map[prodId]||0;
+  return Object.values(map).reduce((a,b)=>a+b,0);
+}
+
+function addLager(type, qty, prodId){
+  if(type==='usb'){DB.lager.usb=(DB.lager.usb||0)+qty;}
+  else if(type==='led'){DB.lager.led=(DB.lager.led||0)+qty;}
+  else if(type==='karton'){DB.lager.karton=(DB.lager.karton||0)+qty;}
+  else{
+    if(!DB.lager[type]) DB.lager[type]={};
+    if(!prodId) return;
+    DB.lager[type][prodId]=(DB.lager[type][prodId]||0)+qty;
+  }
+}
+
+function deductLager(type, qty, prodId){
+  if(type==='usb'){DB.lager.usb=Math.max(0,(DB.lager.usb||0)-qty);}
+  else if(type==='led'){DB.lager.led=Math.max(0,(DB.lager.led||0)-qty);}
+  else if(type==='karton'){DB.lager.karton=Math.max(0,(DB.lager.karton||0)-qty);}
+  else{
+    if(!DB.lager[type]) DB.lager[type]={};
+    if(!prodId) return;
+    DB.lager[type][prodId]=Math.max(0,(DB.lager[type][prodId]||0)-qty);
+  }
+}
+
+function checkLagerAlerts(){
+  const alerts = [];
+  const lim = DB.compLimits||{};
+  if((DB.lager.usb||0) <= (lim.usb||20)) alerts.push({type:'warn', msg:`USB kablovi: ostalo ${DB.lager.usb||0} kom — naruči novu turu!`});
+  if((DB.lager.led||0) <= (lim.led||20)) alerts.push({type:'warn', msg:`LED traka: ostalo ${fmt(DB.lager.led||0)}m — naruči novu turu!`});
+  if((DB.lager.karton||0) <= (lim.karton||10)) alerts.push({type:'warn', msg:`Kutije za pakovanje: ostalo ${DB.lager.karton||0} kom`});
+  return alerts;
+}
+
+// ===================== ORDER STATUS LOGIC =====================
+// Status: pending → processing → ready → fulfilled
+function getOrderReadiness(order){
+  const result = {items:[], canFulfill: true, needsWork: false};
+  (order.items||[]).forEach(it=>{
+    const p = getProdById(it.productId);
+    const pName = p ? p.name : 'Nepoznat';
+    const needed = it.qty||1;
+    const gotove = getLagerQty('gotove', it.productId);
+    const sklopljene = getLagerQty('sklopljene', it.productId);
+    const lica = getLagerQty('lica', it.productId);
+    const kutije = getLagerQty('kutije_stamp', it.productId);
+    const usb = getLagerQty('usb');
+    const led = getLagerQty('led');
+    const ledNeeded = (p?.led||1)*needed;
+    const usbNeeded = (p?.usb||1)*needed;
+
+    let status, hint, canDo=true;
+    if(gotove >= needed){
+      status = 'ready';
+      hint = `${gotove} gotovih na lageru`;
+    } else if((sklopljene >= needed) && (lica >= needed)){
+      status = 'need_glue';
+      hint = `Imаš ${sklopljene} sklopljenih + ${lica} lica — zalepi!`;
+      result.needsWork = true; canDo = false;
+    } else if((kutije >= needed) && (usb >= usbNeeded) && (led >= ledNeeded) && (lica >= needed)){
+      status = 'need_assembly';
+      hint = `Imaš sve delove — sklopi i zalepi!`;
+      result.needsWork = true; canDo = false;
+    } else {
+      status = 'missing';
+      const missing = [];
+      if(gotove < needed) missing.push(`${needed-gotove} gotovih lampi`);
+      hint = `Fali: ${missing.join(', ')}`;
+      result.needsWork = true; canDo = false;
+    }
+    result.items.push({pName, needed, status, hint, productId: it.productId, gotove, sklopljene, lica, canDo});
+    if(!canDo) result.canFulfill = false;
+  });
+  return result;
+}
+
+// ===================== DASHBOARD =====================
+function renderDash(){
+  const now = new Date();
+  document.getElementById('dash-date').textContent = now.toLocaleDateString('sr-RS',{weekday:'long',day:'numeric',month:'long'});
+
+  // Alerts
+  const alertsEl = document.getElementById('dash-alerts');
+  const lagerAlerts = checkLagerAlerts();
+  // Check reklame today
+  const todayStr = today();
+  const hasReklToday = DB.reklame.find(r=>r.date===todayStr);
+  let alertsHTML = '';
+  if(!hasReklToday){
+    alertsHTML += `<div class="alert warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span><strong>Nisi uneo reklame za danas</strong> — <a href="#" onclick="openMetaModal();return false" style="color:inherit">Unesi sada</a></span></div>`;
+  }
+  lagerAlerts.forEach(a=>{
+    alertsHTML += `<div class="alert ${a.type}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>${a.msg}</span></div>`;
+  });
+  alertsEl.innerHTML = alertsHTML;
+
+  // Stats this month
+  const mo = currentFinMonth, yr = currentFinYear;
+  const nowM = now.getMonth(), nowY = now.getFullYear();
+  const mOrds = DB.orders.filter(o=>{
+    const d = new Date(o.createdAt);
+    return d.getMonth()===nowM && d.getFullYear()===nowY;
+  });
+  const fulfilled = mOrds.filter(o=>o.status==='fulfilled');
+  let prihod=0, profit=0;
+  fulfilled.forEach(o=>{const r=calcProfitPerOrder(o);prihod+=r.prihod;profit+=r.profit;});
+  const totalRekl = DB.reklame.filter(r=>{
+    const d = new Date(r.date);
+    return d.getMonth()===nowM&&d.getFullYear()===nowY;
+  }).reduce((a,b)=>a+(b.amount||0),0);
+  const finalProfit = profit - totalRekl;
+  const pending = DB.orders.filter(o=>o.status!=='fulfilled');
+
+  document.getElementById('dash-stats').innerHTML = `
+    <div class="stat-card"><div class="stat-lbl">Na čekanju</div><div class="stat-num blue">${pending.length}<small> ord.</small></div><div class="stat-sub">čeka obradu</div></div>
+    <div class="stat-card"><div class="stat-lbl">Prihod (mesec)</div><div class="stat-num">${fmt(prihod)}<small> RSD</small></div></div>
+    <div class="stat-card"><div class="stat-lbl">Profit (mesec)</div><div class="stat-num green">${fmt(profit)}<small> RSD</small></div></div>
+    <div class="stat-card"><div class="stat-lbl">Krajnji profit</div><div class="stat-num ${finalProfit>=0?'green':'red'}">${fmt(finalProfit)}<small> RSD</small></div><div class="stat-sub">−${fmt(totalRekl)} reklame</div></div>
+  `;
+
+  // Pending orders
+  const pendingOrds = DB.orders.filter(o=>o.status!=='fulfilled').slice(0,5);
+  const dashOrdEl = document.getElementById('dash-orders');
+  if(pendingOrds.length===0){
+    dashOrdEl.innerHTML = `<div class="alert ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg><span>Nema narudžbina na čekanju!</span></div>`;
+  } else {
+    dashOrdEl.innerHTML = pendingOrds.map(o=>renderOrderCard(o,true)).join('');
+  }
+
+  // Lager quick
+  const lagEl = document.getElementById('dash-lager-quick');
+  const prodNames = {};
+  DB.products.forEach(p=>prodNames[p.id]=p.name);
+  let lagHTML = '<div class="card" style="padding:12px 16px">';
+  lagHTML += `<div class="comp-row"><div class="comp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg></div><div class="comp-left"><div class="comp-name">USB kablovi</div></div><div class="comp-right"><div class="comp-qty ${(DB.lager.usb||0)<=(DB.compLimits?.usb||20)?'comp-warn':'comp-ok'}">${DB.lager.usb||0}</div><div class="comp-unit">kom</div></div></div>`;
+  lagHTML += `<div class="comp-row"><div class="comp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="13 2 13 9 20 9"/><path d="M20 14v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h7l7 7z"/></svg></div><div class="comp-left"><div class="comp-name">LED traka</div></div><div class="comp-right"><div class="comp-qty ${(DB.lager.led||0)<=(DB.compLimits?.led||20)?'comp-warn':'comp-ok'}">${DB.lager.led||0}</div><div class="comp-unit">m</div></div></div>`;
+  lagHTML += `<div class="comp-row"><div class="comp-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><div class="comp-left"><div class="comp-name">Kutije za pakovanje</div></div><div class="comp-right"><div class="comp-qty ${(DB.lager.karton||0)<=(DB.compLimits?.karton||10)?'comp-warn':'comp-ok'}">${DB.lager.karton||0}</div><div class="comp-unit">kom</div></div></div>`;
+  // Gotove po proizvodu
+  DB.products.forEach(p=>{
+    const g = getLagerQty('gotove',p.id);
+    if(g>0) lagHTML += `<div class="comp-row"><div class="comp-icon" style="background:var(--green-bg)"><svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div><div class="comp-left"><div class="comp-name">${p.name}</div><div class="comp-detail">Gotovih lampi</div></div><div class="comp-right"><div class="comp-qty comp-ok">${g}</div><div class="comp-unit">kom</div></div></div>`;
+  });
+  lagHTML += '</div>';
+  lagEl.innerHTML = lagHTML;
+}
+
+// ===================== ORDERS =====================
+function renderOrds(){
+  const all = DB.orders.filter(o=>o.status!=='fulfilled');
+  const pending = all.filter(o=>o.status==='pending'||o.status==='processing');
+  const ready = all.filter(o=>o.status==='ready');
+  let show = ordFilter==='pending' ? pending : ordFilter==='ready' ? ready : DB.orders;
+  document.getElementById('ord-sub').textContent = `${pending.length} na čekanju · ${ready.length} spremo`;
+  document.getElementById('ord-list').innerHTML = show.length===0
+    ? `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg><p>Nema narudžbina</p></div>`
+    : show.map(o=>renderOrderCard(o,false)).join('');
+}
+
+function filterOrds(f, el){
+  ordFilter = f;
+  document.querySelectorAll('#s-ord .tab').forEach(t=>t.classList.remove('on'));
+  el.classList.add('on');
+  renderOrds();
+}
+
+function renderOrderCard(order, compact){
+  const r = getOrderReadiness(order);
+  const statusMap = {pending:'gray',processing:'blue',ready:'green',fulfilled:'green'};
+  const statusLbl = {pending:'Novo',processing:'U obradi',ready:'Spreman',fulfilled:'Poslato'};
+  const sc = statusMap[order.status]||'gray';
+  const sl = statusLbl[order.status]||order.status;
+
+  let itemsHTML = (order.items||[]).map(it=>{
+    const p = getProdById(it.productId);
+    return `<div class="ord-item-row"><span class="ord-item-name">${p?p.name:'?'}</span><span class="ord-item-qty">×${it.qty}</span></div>`;
+  }).join('');
+
+  let readinessHTML = '';
+  if(!compact){
+    r.items.forEach(ri=>{
+      const icons = {ready:'✓',need_glue:'⚡',need_assembly:'🔧',missing:'✗'};
+      const clrs = {ready:'green',need_glue:'warn',need_assembly:'blue',missing:'red'};
+      readinessHTML += `<div class="alert ${clrs[ri.status]}" style="margin:4px 0;padding:8px 12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg><span><strong>${ri.pName} ×${ri.needed}:</strong> ${ri.hint}</span></div>`;
+    });
+  }
+
+  const {prihod, profit} = calcProfitPerOrder(order);
+
+  return `<div class="ord-card">
+    <div class="ord-head">
+      <div>
+        <div class="ord-name">${order.shopifyId||'#—'} ${order.customer?'· '+order.customer:''}</div>
+        <div class="ord-meta">${fmtDate(order.createdAt)} · ${fmt(prihod)} RSD</div>
+      </div>
+      <span class="badge ${sc}">${sl}</span>
+    </div>
+    <div class="ord-body">
+      <div class="ord-items">${itemsHTML}</div>
+      ${readinessHTML}
+    </div>
+    <div class="ord-status-bar">
+      <span class="ord-status-info">Profit: <strong>${fmt(profit)} RSD</strong></span>
+      <div style="display:flex;gap:8px">
+        ${order.status!=='ready'&&r.canFulfill ? `<button class="btn xs primary" onclick="markReady('${order.id}')">Spreman</button>` : ''}
+        ${order.status==='ready' ? `<button class="btn xs primary" onclick="markFulfilled('${order.id}')">Fulfilled ✓</button>` : ''}
+        ${!r.canFulfill&&order.status!=='ready' ? `<button class="btn xs" onclick="openOrdAction('${order.id}')">Šta raditi?</button>` : ''}
+        <button class="btn xs ghost" onclick="deleteOrder('${order.id}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="13" height="13"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function markReady(id){
+  const o = DB.orders.find(x=>x.id===id);
+  if(!o) return;
+  // Check if we have gotove lampe
+  let ok = true;
+  (o.items||[]).forEach(it=>{
+    if(getLagerQty('gotove',it.productId) < (it.qty||1)) ok = false;
+  });
+  if(!ok){toast('⚠ Nemaš dovoljno gotovih lampi na lageru!'); return;}
+  o.status = 'ready';
+  save(); renderOrds(); renderDash();
+  toast('✓ Označeno kao spreman za slanje');
+}
+
+function markFulfilled(id){
+  const o = DB.orders.find(x=>x.id===id);
+  if(!o) return;
+  // Deduct gotove lampe + karton
+  (o.items||[]).forEach(it=>{
+    deductLager('gotove', it.qty||1, it.productId);
+  });
+  deductLager('karton', 1);
+  o.status = 'fulfilled';
+  o.fulfilledAt = new Date().toISOString();
+  save(); renderOrds(); renderDash();
+  toast('✓ Fulfilled! Lampa sklopljena sa lagera.');
+}
+
+function deleteOrder(id){
+  if(!confirm('Obriši narudžbinu?')) return;
+  DB.orders = DB.orders.filter(x=>x.id!==id);
+  save(); renderOrds(); renderDash();
+}
+
+function openOrdAction(id){
+  const o = DB.orders.find(x=>x.id===id);
+  if(!o) return;
+  const r = getOrderReadiness(o);
+  document.getElementById('m-ord-action-title').textContent = `${o.shopifyId||'Narudžbina'} — šta uraditi`;
+  let html = '';
+  r.items.forEach(ri=>{
+    const statusMsg = {
+      ready: `<div class="alert ok">✓ ${ri.pName}: spreman</div>`,
+      need_glue: `<div class="alert warn">⚡ ${ri.pName}: imaš sklopljenu kutiju i lice — <strong>zalepi lice!</strong></div>`,
+      need_assembly: `<div class="alert blue">🔧 ${ri.pName}: imaš sve delove — <strong>sklopi kutiju, pa zalepi lice</strong></div>`,
+      missing: `<div class="alert danger">✗ ${ri.pName}: fali materijal — provjeri lager</div>`
+    };
+    html += statusMsg[ri.status]||'';
+  });
+  // Suggest action buttons
+  document.getElementById('m-ord-action-body').innerHTML = html;
+  document.getElementById('m-ord-action-btns').innerHTML = `
+    <button class="btn" onclick="closeModal('m-ord-action')">Zatvori</button>
+    <button class="btn primary" onclick="closeModal('m-ord-action');goTo('lag')">Idi na lager</button>
+  `;
+  openModal('m-ord-action');
+}
+
+// Order items
+let ordItemCount = 0;
+function addOrdItem(){
+  ordItemCount++;
+  const wrap = document.getElementById('ord-items-list');
+  const opts = DB.products.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+  const div = document.createElement('div');
+  div.style.cssText='display:flex;gap:8px;margin-bottom:8px;align-items:center';
+  div.innerHTML = `<select class="fi" style="flex:1" name="ord-prod">${opts}</select><input class="fi" style="width:70px" type="number" name="ord-qty" value="1" min="1"><button class="btn xs ghost" onclick="this.parentElement.remove()" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
+  wrap.appendChild(div);
+}
+
+function saveOrder(){
+  const shopifyId = document.getElementById('ord-shopify-id').value.trim();
+  const customer = document.getElementById('ord-customer').value.trim();
+  const total = parseFloat(document.getElementById('ord-total').value)||0;
+  const prodEls = document.querySelectorAll('[name="ord-prod"]');
+  const qtyEls = document.querySelectorAll('[name="ord-qty"]');
+  if(prodEls.length===0){toast('Dodaj bar jednu stavku!');return;}
+  const items = [];
+  prodEls.forEach((el,i)=>{
+    items.push({productId:el.value, qty:parseInt(qtyEls[i]?.value)||1});
+  });
+  DB.orders.push({id:uid(), shopifyId, customer, items, total, status:'pending', createdAt:new Date().toISOString()});
+  save();
+  closeModal('m-add-ord');
+  document.getElementById('ord-shopify-id').value='';
+  document.getElementById('ord-customer').value='';
+  document.getElementById('ord-total').value='';
+  document.getElementById('ord-items-list').innerHTML='';
+  renderOrds(); renderDash();
+  toast('✓ Narudžbina dodana');
+}
+
+// ===================== LAGER =====================
+function lagTab(t, el){
+  lagTabCurrent = t;
+  document.querySelectorAll('#s-lag .tab').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('lag-comp').style.display = t==='comp'?'':'none';
+  document.getElementById('lag-prod').style.display = t==='prod'?'':'none';
+  if(t==='comp') renderLagComp();
+  if(t==='prod') renderLagProd();
+}
+
+function renderLag(){
+  if(lagTabCurrent==='comp') renderLagComp();
+  else renderLagProd();
+}
+
+function renderLagComp(){
+  let html = '<div class="card" style="padding:12px 16px">';
+  html += '<div class="card-hdr"><span class="card-title">Sirovine</span></div>';
+
+  // USB
+  const usbLim = DB.compLimits?.usb||20;
+  const usbQ = DB.lager.usb||0;
+  html += compRowHTML('usb', 'USB kablovi', '', usbQ, 'kom', usbLim);
+  // LED
+  const ledLim = DB.compLimits?.led||20;
+  const ledQ = DB.lager.led||0;
+  html += compRowHTML('led', 'LED traka', '', ledQ, 'm', ledLim);
+  // Karton
+  const kartonLim = DB.compLimits?.karton||10;
+  const kartonQ = DB.lager.karton||0;
+  html += compRowHTML('karton', 'Kutije za pakovanje', 'Karton za slanje', kartonQ, 'kom', kartonLim);
+  html += '</div>';
+
+  // Po proizvodu
+  if(DB.products.length>0){
+    html += '<div class="card" style="padding:12px 16px"><div class="card-hdr"><span class="card-title">Po proizvodu</span></div>';
+    DB.products.forEach(p=>{
+      const lice = getLagerQty('lica',p.id);
+      const kut = getLagerQty('kutije_stamp',p.id);
+      const sklop = getLagerQty('sklopljene',p.id);
+      const gotova = getLagerQty('gotove',p.id);
+      html += `<div style="border-bottom:0.5px solid var(--border);padding:12px 0">`;
+      html += `<div style="font-weight:600;font-size:14px;margin-bottom:8px">${p.name}</div>`;
+      html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">`;
+      html += miniStat('Lica', lice, 'kom');
+      html += miniStat('Kutije stamp.', kut, 'kom');
+      html += miniStat('Sklopljene', sklop, 'kom');
+      html += miniStat('Gotove lampe', gotova, 'kom', true);
+      html += `</div></div>`;
+    });
+    html += '</div>';
+  } else {
+    html += `<div class="alert info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><span>Dodaj proizvode u Podešavanjima da pratiš lager po proizvodu.</span></div>`;
+  }
+
+  document.getElementById('lag-comp').innerHTML = html;
+}
+
+function miniStat(lbl, val, unit, highlight){
+  return `<div style="background:var(--surface2);border-radius:var(--rs);padding:8px 10px">
+    <div style="font-size:11px;color:var(--text3);margin-bottom:2px">${lbl}</div>
+    <div style="font-size:20px;font-weight:700;color:${highlight&&val>0?'var(--green)':'var(--text)'}">${val} <span style="font-size:12px;font-weight:400;color:var(--text3)">${unit}</span></div>
+  </div>`;
+}
+
+function compRowHTML(key, name, detail, qty, unit, limit){
+  const clr = qty<=0?'comp-low':qty<=limit?'comp-warn':'comp-ok';
+  const prog = Math.min(100, (qty/(limit*2))*100);
+  const progClr = qty<=0?'red':qty<=limit?'warn':'green';
+  return `<div class="comp-row">
+    <div class="comp-left">
+      <div class="comp-name">${name}</div>
+      ${detail?`<div class="comp-detail">${detail}</div>`:''}
+      <div class="prog"><div class="prog-fill ${progClr}" style="width:${prog}%"></div></div>
+    </div>
+    <div class="comp-right">
+      <div class="comp-qty ${clr}">${qty}</div>
+      <div class="comp-unit">${unit}</div>
+    </div>
+  </div>`;
+}
+
+function renderLagProd(){
+  if(DB.products.length===0){
+    document.getElementById('lag-prod').innerHTML = `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg><p>Nema proizvoda — dodaj u Podešavanjima</p></div>`;
+    return;
+  }
+  let html = '';
+  DB.products.forEach(p=>{
+    const sklop = getLagerQty('sklopljene',p.id);
+    const gotova = getLagerQty('gotove',p.id);
+    const lica = getLagerQty('lica',p.id);
+    html += `<div class="card">
+      <div class="card-hdr"><span class="card-title">${p.name}</span></div>
+      <div class="flow-row">
+        <div class="flow-phase"><div class="flow-name">Sklopljene kutije</div><div class="flow-sub">kutija+kabl+LED</div></div>
+        <div class="flow-count ${sklop>0?'green':''}">${sklop}</div>
+        <div class="flow-btns">
+          <button class="btn xs primary" onclick="openSklop('sklopi','${p.id}')">+ Sklopi</button>
+        </div>
+      </div>
+      <div class="flow-row">
+        <div class="flow-phase"><div class="flow-name">Gotove lampe</div><div class="flow-sub">+ lice zalepljeno</div></div>
+        <div class="flow-count ${gotova>0?'green':''}">${gotova}</div>
+        <div class="flow-btns">
+          <button class="btn xs primary" onclick="openSklop('zalepi','${p.id}')">+ Zalepi</button>
+        </div>
+      </div>
+      <div style="margin-top:10px;padding-top:10px;border-top:0.5px solid var(--border)">
+        ${sklop>0&&lica>0?`<div class="alert ok" style="margin:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg><span>Možeš napraviti još <strong>${Math.min(sklop,lica)}</strong> gotovih lampi!</span></div>`:''}
+        ${gotova>0?`<div class="alert ok" style="margin:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg><span><strong>${gotova}</strong> gotovih lampi čeka slanje</span></div>`:''}
+      </div>
+    </div>`;
+  });
+  document.getElementById('lag-prod').innerHTML = html;
+}
+
+function openSklop(action, prodId){
+  const p = getProdById(prodId);
+  if(!p) return;
+  sklopAction = {action, prodId};
+  const usb = getLagerQty('usb');
+  const led = getLagerQty('led');
+  const kut = getLagerQty('kutije_stamp', prodId);
+  const lice = getLagerQty('lica', prodId);
+  const sklop = getLagerQty('sklopljene', prodId);
+  const ledNeed = p.led||1;
+  const usbNeed = p.usb||1;
+
+  if(action==='sklopi'){
+    document.getElementById('m-sklop-title').textContent = `Sklopi kutiju — ${p.name}`;
+    const canDo = kut>0 && usb>=usbNeed && led>=ledNeed;
+    document.getElementById('m-sklop-body').innerHTML = `
+      <div class="alert ${canDo?'ok':'warn'}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>Skida se: <strong>1 kutija</strong> · <strong>${usbNeed} USB kabl</strong> · <strong>${ledNeed}m LED</strong></span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">
+        ${miniStat('Kutije',kut,'kom')} ${miniStat('USB',usb,'kom')} ${miniStat('LED',led+'m','')}
+      </div>
+      <div class="fg" style="margin-top:14px"><label>Količina za sklапanje</label><input class="fi" id="sklop-qty" type="number" value="1" min="1" max="${Math.min(kut,Math.floor(usb/usbNeed),Math.floor(led/ledNeed))||1}"></div>
+    `;
+    document.getElementById('m-sklop-confirm').disabled = !canDo;
+  } else {
+    document.getElementById('m-sklop-title').textContent = `Zalepi lice — ${p.name}`;
+    const canDo = sklop>0 && lice>0;
+    document.getElementById('m-sklop-body').innerHTML = `
+      <div class="alert ${canDo?'ok':'warn'}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>Skida se: <strong>1 sklopljena kutija</strong> · <strong>1 lice</strong> → dobijаš <strong>gotovu lampu</strong></span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+        ${miniStat('Sklopljene',sklop,'kom')} ${miniStat('Lica',lice,'kom')}
+      </div>
+      <div class="fg" style="margin-top:14px"><label>Količina</label><input class="fi" id="sklop-qty" type="number" value="1" min="1" max="${Math.min(sklop,lice)||1}"></div>
+    `;
+    document.getElementById('m-sklop-confirm').disabled = !canDo;
+  }
+  openModal('m-sklop');
+}
+
+function confirmSklop(){
+  if(!sklopAction) return;
+  const {action, prodId} = sklopAction;
+  const qty = parseInt(document.getElementById('sklop-qty')?.value)||1;
+  const p = getProdById(prodId);
+  if(!p) return;
+
+  if(action==='sklopi'){
+    deductLager('kutije_stamp', qty, prodId);
+    deductLager('usb', (p.usb||1)*qty);
+    deductLager('led', (p.led||1)*qty);
+    addLager('sklopljene', qty, prodId);
+    toast(`✓ Sklopljeno ${qty} kutija — lager ažuriran`);
+  } else {
+    deductLager('sklopljene', qty, prodId);
+    deductLager('lica', qty, prodId);
+    addLager('gotove', qty, prodId);
+    toast(`✓ Zalepljeno ${qty} lica — ${qty} gotovih lampi!`);
+  }
+  save(); closeModal('m-sklop');
+  renderLag(); renderDash();
+}
+
+// ===================== COMPONENT MODAL =====================
+function onCompSelect(){
+  const val = document.getElementById('comp-select').value;
+  const prodWrap = document.getElementById('comp-prod-wrap');
+  const unitLbl = document.getElementById('comp-unit-lbl');
+  const deductInfo = document.getElementById('comp-deduct-info');
+  deductInfo.style.display='none';
+
+  const prodNeeded = ['lica','kutije_stamp','sklopljene','gotove'];
+  prodWrap.style.display = prodNeeded.includes(val)?'':'none';
+
+  const units = {usb:'kom',led:'m (metri)',karton:'kom',lica:'kom',kutije_stamp:'kom',sklopljene:'kom',gotove:'kom'};
+  unitLbl.textContent = '('+( units[val]||'kom')+')';
+
+  if(val==='sklopljene'){
+    deductInfo.style.display='flex';
+    deductInfo.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Dodavanjem sklopljenih kutija skida se: kutija štampana + USB kabl + LED traka</span>`;
+  } else if(val==='gotove'){
+    deductInfo.style.display='flex';
+    deductInfo.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Dodavanjem gotovih lampi skida se: sklopljena kutija + lice</span>`;
+  }
+
+  if(prodNeeded.includes(val)){
+    const sel = document.getElementById('comp-prod-select');
+    sel.innerHTML = DB.products.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+  }
+}
+
+function saveComp(){
+  const type = document.getElementById('comp-select').value;
+  if(!type){toast('Izaberi komponentu');return;}
+  const qty = parseFloat(document.getElementById('comp-qty').value)||0;
+  if(qty<=0){toast('Unesi količinu');return;}
+  const prodId = document.getElementById('comp-prod-select').value;
+  const price = parseFloat(document.getElementById('comp-price').value)||0;
+
+  const prodNeeded = ['lica','kutije_stamp','sklopljene','gotove'];
+  if(prodNeeded.includes(type) && !prodId){toast('Izaberi proizvod');return;}
+
+  // Auto-deduct on sklopi/gotove
+  if(type==='sklopljene' && prodId){
+    const p = getProdById(prodId);
+    if(p){
+      deductLager('kutije_stamp', qty, prodId);
+      deductLager('usb', (p.usb||1)*qty);
+      deductLager('led', (p.led||1)*qty);
+    }
+  } else if(type==='gotove' && prodId){
+    deductLager('sklopljene', qty, prodId);
+    deductLager('lica', qty, prodId);
+  }
+
+  addLager(type, qty, prodId||undefined);
+
+  // If price entered, add as cost
+  if(price>0){
+    const typeNames = {usb:'USB kablovi',led:'LED traka',karton:'Kutije za pakovanje',lica:'Lica',kutije_stamp:'Kutije štampane',sklopljene:'Sklopljene kutije',gotove:'Gotove lampe'};
+    DB.costs.push({id:uid(), cat:'material', desc:typeNames[type]||type, amount:price, date:today()});
+  }
+
+  save(); closeModal('m-add-comp');
+  document.getElementById('comp-qty').value='';
+  document.getElementById('comp-price').value='';
+  renderLag(); renderDash();
+  toast('✓ Lager ažuriran');
+}
+
+// ===================== FINANSIJE =====================
+function renderFin(){
+  const mo = currentFinMonth, yr = currentFinYear;
+  const months = ['Januar','Februar','Mart','April','Maj','Jun','Jul','Avgust','Septembar','Oktobar','Novembar','Decembar'];
+  document.getElementById('fin-month-lbl').textContent = `${months[mo]} ${yr}`;
+
+  const ords = DB.orders.filter(o=>{
+    const d = new Date(o.fulfilledAt||o.createdAt);
+    return o.status==='fulfilled' && d.getMonth()===mo && d.getFullYear()===yr;
+  });
+
+  // Stats
+  let totalPrihod=0, totalProfit=0;
+  const byProd = {};
+  ords.forEach(o=>{
+    const r = calcProfitPerOrder(o);
+    totalPrihod += r.prihod;
+    totalProfit += r.profit;
+    (o.items||[]).forEach(it=>{
+      if(!byProd[it.productId]) byProd[it.productId]={qty:0,prihod:0,profit:0};
+      byProd[it.productId].qty += it.qty||1;
+    });
+  });
+
+  const rekl = DB.reklame.filter(r=>{
+    const d = new Date(r.date);
+    return d.getMonth()===mo && d.getFullYear()===yr;
+  });
+  const totalRekl = rekl.reduce((a,b)=>a+(b.amount||0),0);
+  const finalProfit = totalProfit - totalRekl;
+
+  let html = '';
+
+  // Big profit highlight
+  html += `<div class="profit-big">
+    <div><div class="profit-big-lbl">Krajnji profit</div><div style="font-size:13px;color:var(--green-mid)">profit − reklame</div></div>
+    <div class="profit-big-val">${fmt(finalProfit)} <span style="font-size:16px;color:var(--green-mid)">RSD</span></div>
+  </div>`;
+
+  // Overview stats
+  html += `<div class="stats2" style="margin-bottom:14px">
+    <div class="stat-card"><div class="stat-lbl">Prihod</div><div class="stat-num">${fmt(totalPrihod)}<small> RSD</small></div></div>
+    <div class="stat-card"><div class="stat-lbl">Profit (bruto)</div><div class="stat-num green">${fmt(totalProfit)}<small> RSD</small></div></div>
+    <div class="stat-card"><div class="stat-lbl">Reklame</div><div class="stat-num red">−${fmt(totalRekl)}<small> RSD</small></div></div>
+    <div class="stat-card"><div class="stat-lbl">Narudžbine</div><div class="stat-num blue">${ords.length}<small> kom</small></div></div>
+  </div>`;
+
+  // ROAS & CPA
+  if(totalRekl>0){
+    const roas = totalPrihod/totalRekl;
+    const cpa = totalRekl/Math.max(ords.length,1);
+    html += `<div class="card"><div class="card-hdr"><span class="card-title">Efikasnost reklama</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><div style="font-size:12px;color:var(--text2);margin-bottom:3px">ROAS</div><div style="font-size:24px;font-weight:700;color:${roas>=3?'var(--green)':'var(--warn)'}">${roas.toFixed(2)}</div></div>
+        <div><div style="font-size:12px;color:var(--text2);margin-bottom:3px">CPA (cena po narudžbini)</div><div style="font-size:24px;font-weight:700;">${fmt(cpa)} <span style="font-size:14px;font-weight:400;color:var(--text2)">RSD</span></div></div>
+      </div>
+    </div>`;
+  }
+
+  // By product
+  if(Object.keys(byProd).length>0){
+    html += `<div class="card"><div class="card-hdr"><span class="card-title">Po proizvodu</span></div><table class="fin-table"><thead><tr><th>Proizvod</th><th>Kom</th><th>Prihod</th></tr></thead><tbody>`;
+    Object.entries(byProd).forEach(([pid,d])=>{
+      const p = getProdById(pid);
+      html += `<tr><td>${p?p.name:'?'}</td><td class="num">${d.qty}</td><td class="num">${fmt(d.prihod)} RSD</td></tr>`;
+    });
+    html += `</tbody></table></div>`;
+  }
+
+  // Reklame
+  html += `<div class="sec-lbl" style="display:flex;align-items:center;justify-content:space-between">
+    <span>Reklame</span>
+    <button class="btn xs" onclick="openMetaModal()">+ Unesi / Sync</button>
+  </div>`;
+  if(rekl.length===0){
+    html += `<div class="alert warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Nema unesenih reklama za ovaj mesec</span></div>`;
+  } else {
+    html += `<div class="card" style="padding:12px 16px">`;
+    rekl.sort((a,b)=>b.date.localeCompare(a.date)).forEach(r=>{
+      html += `<div class="rekl-row"><div class="rekl-date">${fmtDate(r.date)}</div><div class="rekl-amt">−${fmt(r.amount)} RSD</div><button class="btn xs ghost" onclick="deleteRekl('${r.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="13" height="13"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>`;
+    });
+    html += `</div>`;
+  }
+
+  // Rashodi
+  const costs = DB.costs.filter(c=>{
+    const d = new Date(c.date);
+    return d.getMonth()===mo&&d.getFullYear()===yr&&c.cat!=='reklame';
+  });
+  html += `<div class="sec-lbl" style="display:flex;align-items:center;justify-content:space-between">
+    <span>Ostali rashodi</span>
+    <button class="btn xs" onclick="openCostModal()">+ Dodaj</button>
+  </div>`;
+  if(costs.length>0){
+    html += `<div class="card" style="padding:12px 16px">`;
+    const catIcons = {filament:'🎨',material:'📦',postarina_faktura:'🚚',shopify:'💻',ostalo:'💡'};
+    costs.forEach(c=>{
+      html += `<div class="rekl-row"><div><div class="rekl-date">${catIcons[c.cat]||'💡'} ${c.desc||c.cat}</div><div style="font-size:12px;color:var(--text3)">${fmtDate(c.date)}</div></div><div style="display:flex;align-items:center;gap:8px"><span class="rekl-amt">−${fmt(c.amount)} RSD</span><button class="btn xs ghost" onclick="deleteCost('${c.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="13" height="13"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div></div>`;
+    });
+    html += '</div>';
+  }
+
+  document.getElementById('fin-body').innerHTML = html;
+}
+
+function changeMonth(dir){
+  currentFinMonth += dir;
+  if(currentFinMonth>11){currentFinMonth=0;currentFinYear++;}
+  if(currentFinMonth<0){currentFinMonth=11;currentFinYear--;}
+  renderFin();
+}
+
+function deleteRekl(id){
+  DB.reklame = DB.reklame.filter(r=>r.id!==id);
+  save(); renderFin();
+}
+
+function deleteCost(id){
+  DB.costs = DB.costs.filter(c=>c.id!==id);
+  save(); renderFin();
+}
+
+function saveCost(){
+  const cat = document.getElementById('cost-cat').value;
+  const desc = document.getElementById('cost-desc').value;
+  const amount = parseFloat(document.getElementById('cost-amt').value)||0;
+  const date = document.getElementById('cost-date').value||today();
+  if(!amount){toast('Unesi iznos');return;}
+  DB.costs.push({id:uid(), cat, desc, amount, date});
+  save(); closeModal('m-add-cost');
+  renderFin(); renderDash();
+  toast('✓ Rashod dodan');
+}
+
+function openCostModal(){
+  document.getElementById('cost-date').value = today();
+  openModal('m-add-cost');
+}
+
+// ===================== META / REKLAME =====================
+function openMetaModal(){
+  const todayStr = today();
+  const existing = DB.reklame.find(r=>r.date===todayStr);
+  document.getElementById('m-meta-body').innerHTML = `
+    ${existing?`<div class="alert ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg><span>Danas uneseno: <strong>${fmt(existing.amount)} RSD</strong></span></div>`:`<div class="alert warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Nisi uneo reklame za danas</span></div>`}
+    <div class="fg" style="margin-top:14px"><label>Datum</label><input class="fi" id="meta-date" type="date" value="${todayStr}"></div>
+    <div class="fg"><label>Iznos potrošen (RSD)</label><input class="fi" id="meta-amt" type="number" placeholder="1500" value="${existing?existing.amount:''}"></div>
+  `;
+  openModal('m-meta');
+}
+
+function pullMetaToday(){
+  const date = document.getElementById('meta-date').value||today();
+  const amt = parseFloat(document.getElementById('meta-amt').value)||0;
+  if(!amt){toast('Unesi iznos');return;}
+  // Remove existing for this date
+  DB.reklame = DB.reklame.filter(r=>r.date!==date);
+  DB.reklame.push({id:uid(), date, amount:amt});
+  save(); closeModal('m-meta');
+  renderFin(); renderDash();
+  toast(`✓ Reklame za ${fmtDate(date)}: ${fmt(amt)} RSD`);
+}
+
+// ===================== SYNC SHOPIFY =====================
+async function doSync(){
+  const btn = document.getElementById('sync-btn');
+  btn.innerHTML = '<div class="spinner"></div> Sync...';
+  btn.disabled = true;
+  try {
+    const url = DB.settings.shopUrl;
+    const token = DB.settings.shopToken;
+    if(!url||!token){toast('⚠ Unesi Shopify API podatke u Podešavanjima'); btn.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="15" height="15"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg> Sync`; btn.disabled=false; return;}
+
+    // Shopify API — last 60 days unfulfilled
+    const since = new Date(Date.now()-60*86400000).toISOString();
+    const resp = await fetch(`https://${url}/admin/api/2024-01/orders.json?status=open&created_at_min=${since}&limit=50`, {
+      headers:{'X-Shopify-Access-Token': token, 'Content-Type':'application/json'}
+    });
+    if(!resp.ok) throw new Error('Shopify API greška: '+resp.status);
+    const data = await resp.json();
+    const shopifyOrds = data.orders||[];
+
+    let added=0, updated=0;
+    shopifyOrds.forEach(so=>{
+      const existing = DB.orders.find(o=>o.shopifyId==='#'+so.order_number||o.shopifyId===String(so.id));
+      const items = (so.line_items||[]).map(li=>{
+        const prod = DB.products.find(p=>p.shopifyId===String(li.product_id));
+        return {productId: prod?prod.id:'unknown', qty: li.quantity, name: li.title};
+      });
+      const total = parseFloat(so.total_price)||0;
+      if(!existing){
+        DB.orders.push({
+          id: uid(),
+          shopifyId: '#'+so.order_number,
+          customer: so.shipping_address?.first_name||so.email||'',
+          items, total,
+          status: so.fulfillment_status==='fulfilled'?'fulfilled':'pending',
+          createdAt: so.created_at,
+          fulfilledAt: so.fulfilled_at||null
+        });
+        added++;
+      } else if(so.fulfillment_status==='fulfilled' && existing.status!=='fulfilled'){
+        // Auto-fulfill
+        (existing.items||[]).forEach(it=>{deductLager('gotove',it.qty||1,it.productId);});
+        deductLager('karton',1);
+        existing.status='fulfilled';
+        existing.fulfilledAt = so.fulfilled_at;
+        updated++;
+      }
+    });
+
+    save(); renderDash(); renderOrds();
+    toast(`✓ Sync završen: ${added} novih, ${updated} ažurirano`);
+  } catch(e){
+    toast('❌ '+e.message);
+  }
+  btn.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="15" height="15"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg> Sync`;
+  btn.disabled=false;
+}
+
+// ===================== PRODUCTS =====================
+function saveProd(){
+  const name = document.getElementById('prod-name').value.trim();
+  if(!name){toast('Unesi naziv');return;}
+  const editId = document.getElementById('prod-edit-id').value;
+  const prod = {
+    id: editId||uid(),
+    name,
+    shopifyId: document.getElementById('prod-shopify-id').value.trim(),
+    price: parseFloat(document.getElementById('prod-price').value)||0,
+    filament_kut: parseFloat(document.getElementById('prod-fg-kut').value)||0,
+    filament_lice: parseFloat(document.getElementById('prod-fg-lice').value)||0,
+    led: parseFloat(document.getElementById('prod-led').value)||1,
+    usb: parseFloat(document.getElementById('prod-usb').value)||1,
+    other_cost: parseFloat(document.getElementById('prod-other').value)||0
+  };
+  if(editId){
+    const idx = DB.products.findIndex(p=>p.id===editId);
+    if(idx>=0) DB.products[idx]=prod;
+  } else {
+    DB.products.push(prod);
+    // Init lager for this product
+    if(!DB.lager.lica[prod.id]) DB.lager.lica[prod.id]=0;
+    if(!DB.lager.kutije_stamp[prod.id]) DB.lager.kutije_stamp[prod.id]=0;
+    if(!DB.lager.sklopljene[prod.id]) DB.lager.sklopljene[prod.id]=0;
+    if(!DB.lager.gotove[prod.id]) DB.lager.gotove[prod.id]=0;
+  }
+  save(); closeModal('m-add-prod');
+  renderSet(); renderLag();
+  document.getElementById('prod-edit-id').value='';
+  toast('✓ Proizvod sačuvan');
+}
+
+function editProd(id){
+  const p = getProdById(id);
+  if(!p) return;
+  document.getElementById('m-prod-title').textContent = 'Uredi proizvod';
+  document.getElementById('prod-name').value = p.name||'';
+  document.getElementById('prod-shopify-id').value = p.shopifyId||'';
+  document.getElementById('prod-price').value = p.price||'';
+  document.getElementById('prod-fg-kut').value = p.filament_kut||'';
+  document.getElementById('prod-fg-lice').value = p.filament_lice||'';
+  document.getElementById('prod-led').value = p.led||'';
+  document.getElementById('prod-usb').value = p.usb||'';
+  document.getElementById('prod-other').value = p.other_cost||'';
+  document.getElementById('prod-edit-id').value = id;
+  openModal('m-add-prod');
+}
+
+// ===================== SETTINGS =====================
+function renderSet(){
+  // Load values
+  const s = DB.settings;
+  document.getElementById('set-shop-url').value = s.shopUrl||'';
+  document.getElementById('set-shop-token').value = s.shopToken||'';
+  document.getElementById('set-meta-token').value = s.metaToken||'';
+  document.getElementById('set-meta-account').value = s.metaAccount||'';
+  document.getElementById('set-filament').value = s.filamentPrice||2000;
+  document.getElementById('set-postarina').value = s.postarina||390;
+  const sw = document.getElementById('meta-auto-switch');
+  if(s.metaAuto) sw.classList.add('on'); else sw.classList.remove('on');
+
+  // Products
+  const pl = document.getElementById('prod-settings-list');
+  if(DB.products.length===0){
+    pl.innerHTML = `<div class="alert info" style="margin-bottom:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Nema proizvoda. Dodaj prvi proizvod.</span></div>`;
+  } else {
+    pl.innerHTML = DB.products.map(p=>{
+      const s2 = DB.settings;
+      const filCost = (((p.filament_kut||0)+(p.filament_lice||0))/1000)*(s2.filamentPrice||2000);
+      const total = filCost+(p.other_cost||0);
+      const profit = (p.price||0)-total-(s2.postarina||390);
+      return `<div class="card" style="margin-bottom:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-weight:600;font-size:15px">${p.name}</div>
+          <button class="btn xs" onclick="editProd('${p.id}')">Uredi</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px">
+          <div style="color:var(--text2)">Cena: <strong>${fmt(p.price)} RSD</strong></div>
+          <div style="color:var(--text2)">Trošak: <strong>${fmt(total)} RSD</strong></div>
+          <div style="color:var(--green)">Profit: <strong>${fmt(profit)} RSD</strong></div>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:5px">
+          Filament: ${(p.filament_kut||0)+(p.filament_lice||0)}g · LED: ${p.led||1}m · USB: ${p.usb||1} kom
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Comp limits
+  const cl = document.getElementById('comp-limits-list');
+  cl.innerHTML = `<div class="card">
+    <div class="fg"><label>USB kablovi — upozori ispod (kom)</label><input class="fi" id="lim-usb" type="number" value="${DB.compLimits?.usb||20}"></div>
+    <div class="fg"><label>LED traka — upozori ispod (m)</label><input class="fi" id="lim-led" type="number" value="${DB.compLimits?.led||20}"></div>
+    <div class="fg"><label>Kutije za pakovanje — upozori ispod (kom)</label><input class="fi" id="lim-karton" type="number" value="${DB.compLimits?.karton||10}"></div>
+    <button class="btn primary full" onclick="saveLimits()">Sačuvaj limite</button>
+  </div>`;
+}
+
+function saveShopify(){
+  DB.settings.shopUrl = document.getElementById('set-shop-url').value.trim();
+  DB.settings.shopToken = document.getElementById('set-shop-token').value.trim();
+  save(); toast('✓ Shopify sačuvan');
+}
+
+function saveMetaConfig(){
+  DB.settings.metaToken = document.getElementById('set-meta-token').value.trim();
+  DB.settings.metaAccount = document.getElementById('set-meta-account').value.trim();
+  save(); toast('✓ Meta config sačuvan');
+}
+
+function toggleMetaAuto(){
+  DB.settings.metaAuto = !DB.settings.metaAuto;
+  const sw = document.getElementById('meta-auto-switch');
+  DB.settings.metaAuto ? sw.classList.add('on') : sw.classList.remove('on');
+  save();
+  if(DB.settings.metaAuto) setupMetaAuto();
+}
+
+function saveGlobal(){
+  DB.settings.filamentPrice = parseFloat(document.getElementById('set-filament').value)||2000;
+  DB.settings.postarina = parseFloat(document.getElementById('set-postarina').value)||390;
+  save(); toast('✓ Podešavanja sačuvana'); renderSet();
+}
+
+function saveLimits(){
+  DB.compLimits.usb = parseInt(document.getElementById('lim-usb').value)||20;
+  DB.compLimits.led = parseInt(document.getElementById('lim-led').value)||20;
+  DB.compLimits.karton = parseInt(document.getElementById('lim-karton').value)||10;
+  save(); toast('✓ Limiti sačuvani'); renderDash();
+}
+
+// ===================== META AUTO =====================
+function setupMetaAuto(){
+  if(!DB.settings.metaAuto) return;
+  const now = new Date();
+  const target = new Date();
+  target.setHours(23,50,0,0);
+  if(now>target) target.setDate(target.getDate()+1);
+  const ms = target-now;
+  setTimeout(async()=>{
+    await pullMetaAuto();
+    setInterval(pullMetaAuto, 86400000);
+  }, ms);
+}
+
+async function pullMetaAuto(){
+  const t = DB.settings.metaToken, acc = DB.settings.metaAccount;
+  if(!t||!acc) return;
+  try {
+    const todayStr = today();
+    const r = await fetch(`https://graph.facebook.com/v18.0/${acc}/insights?fields=spend&time_range={"since":"${todayStr}","until":"${todayStr}"}&access_token=${t}`);
+    const d = await r.json();
+    const spend = parseFloat(d.data?.[0]?.spend||0);
+    if(spend>0){
+      DB.reklame = DB.reklame.filter(x=>x.date!==todayStr);
+      DB.reklame.push({id:uid(), date:todayStr, amount:Math.round(spend)});
+      save(); renderFin(); renderDash();
+    }
+  } catch(e){}
+}
+
+// ===================== EXPORT =====================
+function exportCSV(){
+  const mo = currentFinMonth, yr = currentFinYear;
+  const ords = DB.orders.filter(o=>{
+    const d = new Date(o.fulfilledAt||o.createdAt);
+    return o.status==='fulfilled'&&d.getMonth()===mo&&d.getFullYear()===yr;
+  });
+  let csv = 'Datum,Narudžbina,Kupac,Proizvod,Kolicina,Prihod,Postarina,Profit\n';
+  ords.forEach(o=>{
+    const r = calcProfitPerOrder(o);
+    (o.items||[]).forEach(it=>{
+      const p = getProdById(it.productId);
+      csv += `${fmtDate(o.fulfilledAt||o.createdAt)},${o.shopifyId||''},${o.customer||''},${p?p.name:'?'},${it.qty},${r.prihod},${r.postarina},${r.profit}\n`;
+    });
+  });
+  const blob = new Blob([csv],{type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const months=['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Avg','Sep','Okt','Nov','Dec'];
+  a.download = `3dm-${months[mo]}-${yr}.csv`;
+  a.click();
+}
+
+function exportAll(){
+  const blob = new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '3dm-backup-'+today()+'.json';
+  a.click();
+}
+
+function importAll(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev=>{
+    try{
+      const d = JSON.parse(ev.target.result);
+      if(d.orders&&d.lager&&d.products){
+        DB = d;
+        save(); renderDash();
+        toast('✓ Podaci uvezeni!');
+      } else toast('❌ Neispravan fajl');
+    } catch(err){toast('❌ Greška pri uvozu');}
+  };
+  reader.readAsText(file);
+}
+
+// ===================== INIT =====================
+load();
+renderDash();
+if(DB.settings.metaAuto) setupMetaAuto();
+// Add initial order item slot
+document.getElementById('ord-items-list').innerHTML='';
+addOrdItem();
+
+// Set today in cost date
+document.addEventListener('DOMContentLoaded', ()=>{
+  const cd = document.getElementById('cost-date');
+  if(cd) cd.value = today();
+});
+</script>
+</body>
+</html>
