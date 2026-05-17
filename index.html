@@ -1022,7 +1022,7 @@ async function doSync(){
     const url=DB.settings.shopUrl,token=DB.settings.shopToken;
     if(!url||!token){toast('⚠ Unesi Shopify API u Podešavanjima');return;}
     const since=new Date(Date.now()-60*86400000).toISOString();
-    const resp=await fetch(`/api/shopify?path=orders.json&status=open&created_at_min=${since}&limit=50`,{headers:{'X-Shopify-Access-Token':token,'X-Shopify-URL':url,'X-Shopify-Token':token}});
+    const resp=await fetch(`/api/shopify?`+new URLSearchParams({path:'orders.json',status:'open',created_at_min:since,limit:'50'}).toString(),{headers:{'X-Shopify-URL':url,'X-Shopify-Token':token}});
     if(!resp.ok)throw new Error('Shopify API: '+resp.status);
     const data=await resp.json();
     let added=0,updated=0;
