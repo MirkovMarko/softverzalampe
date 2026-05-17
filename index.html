@@ -731,7 +731,7 @@ function renderOrderCard(order,compact){
   const r=getOrderReadiness(order);
   const sc={pending:'gray',processing:'blue',ready:'green',fulfilled:'green'}[order.status]||'gray';
   const sl={pending:'Novo',processing:'U obradi',ready:'Spreman',fulfilled:'Poslato'}[order.status]||order.status;
-  let itemsHTML=(order.items||[]).map(it=>{const p=getProdById(it.productId||it.product_id);return`<div class="ord-item-row"><span class="ord-item-name">${p?p.name:'?'}</span><span class="ord-item-qty">×${it.qty}</span></div>`;}).join('');
+  let itemsHTML=(order.items||[]).map(it=>{const p=getProdById(it.productId||it.product_id);const name=p?p.name:(it.name||it.title||'Nepoznat proizvod');return`<div class="ord-item-row"><span class="ord-item-name">${name}</span><span class="ord-item-qty">×${it.qty}</span></div>`;}).join('');
   let readHTML='';
   if(!compact){r.items.forEach(ri=>{const clrs={ready:'ok',need_glue:'warn',need_assembly:'info',missing:'danger'};readHTML+=`<div class="alert ${clrs[ri.status]||'info'}" style="margin:4px 0;padding:8px 12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg><span><strong>${ri.pName} ×${ri.needed}:</strong> ${ri.hint}</span></div>`;});}
   const {prihod,profit}=calcProfitPerOrder(order);
@@ -1015,12 +1015,73 @@ async function saveCost(){
 }
 
 // ===================== SHOPIFY SYNC =====================
+async function syncProducts(url, token){
+  const resp = await fetch('https://softverzalampe.vercel.app/api/shopify?path=products.json&limit=50', {
+    headers:{'X-Shopify-URL':url,'X-Shopify-Token':token}
+  });
+  if(!resp.ok) return;
+  const data = await resp.json();
+  const shopifyProds = data.products||[];
+  let added = 0;
+  for(const sp of shopifyProds){
+    const existing = DB.products.find(p=>p.shopify_id===String(sp.id));
+    if(!existing){
+      const prod = {
+        id: uid(),
+        name: sp.title,
+        shopify_id: String(sp.id),
+        price: parseFloat(sp.variants?.[0]?.price||0),
+        filament_kut: 0,
+        filament_lice: 0,
+        led: 1,
+        usb: 1,
+        other_cost: 0,
+        active: true
+      };
+      await sb.upsert('products',[prod]);
+      await sb.upsert('lager',[
+        {key:'lica::'+prod.id,value:0},
+        {key:'kutije_stamp::'+prod.id,value:0},
+        {key:'sklopljene::'+prod.id,value:0},
+        {key:'gotove::'+prod.id,value:0}
+      ]);
+      DB.products.push(prod);
+      DB.lager.lica[prod.id]=0;
+      DB.lager.kutije_stamp[prod.id]=0;
+      DB.lager.sklopljene[prod.id]=0;
+      DB.lager.gotove[prod.id]=0;
+      added++;
+    }
+  }
+  return added;
+}
+
 async function doSync(){
   const btn=document.getElementById('sync-btn');
   btn.innerHTML='<div class="spinner"></div>';btn.disabled=true;
   try{
     const url=DB.settings.shopUrl,token=DB.settings.shopToken;
     if(!url||!token){toast('⚠ Unesi Shopify API u Podešavanjima');return;}
+    // Prvo povuci proizvode iz Shopify-a
+    const addedProds = await syncProducts(url, token);
+    if(addedProds>0) toast('✓ Dodano '+addedProds+' novih proizvoda iz Shopify-a');
+    // Povuci fulfilled narudzbine za ovaj mesec (za prihod)
+    const monthStart=new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString();
+    try{
+      const fulfilledResp=await fetch('https://softverzalampe.vercel.app/api/shopify?'+new URLSearchParams({path:'orders.json',status:'any',fulfillment_status:'shipped',created_at_min:monthStart,limit:'250'}).toString(),{headers:{'X-Shopify-URL':url,'X-Shopify-Token':token}});
+      if(fulfilledResp.ok){
+        const fd=await fulfilledResp.json();
+        for(const so of (fd.orders||[])){
+          const ex=DB.orders.find(o=>o.shopify_id==='#'+so.order_number);
+          if(!ex){
+            const fitems=(so.line_items||[]).map(li=>{const p=DB.products.find(x=>x.shopify_id===String(li.product_id));return{productId:p?p.id:String(li.product_id),qty:li.quantity,name:li.title};});
+            const fo={id:uid(),shopify_id:'#'+so.order_number,customer:so.shipping_address?.first_name||'',items:fitems,total:parseFloat(so.total_price)||0,status:'fulfilled',created_at:so.created_at,fulfilled_at:so.updated_at};
+            await sb.upsert('orders',[{...fo,items:JSON.stringify(fitems)}]);
+            DB.orders.unshift(fo);
+          }
+        }
+      }
+    }catch(e){}
     const since=new Date(Date.now()-60*86400000).toISOString();
     const resp=await fetch(`https://softverzalampe.vercel.app/api/shopify?`+new URLSearchParams({path:'orders.json',status:'open',created_at_min:since,limit:'50'}).toString(),{headers:{'X-Shopify-URL':url,'X-Shopify-Token':token}});
     if(!resp.ok)throw new Error('Shopify API: '+resp.status);
@@ -1028,7 +1089,7 @@ async function doSync(){
     let added=0,updated=0;
     for(const so of (data.orders||[])){
       const existing=DB.orders.find(o=>o.shopify_id==='#'+so.order_number);
-      const items=(so.line_items||[]).map(li=>{const p=DB.products.find(x=>x.shopify_id===String(li.product_id));return{productId:p?p.id:'unknown',qty:li.quantity,name:li.title};});
+      const items=(so.line_items||[]).map(li=>{const p=DB.products.find(x=>x.shopify_id===String(li.product_id));return{productId:p?p.id:String(li.product_id),qty:li.quantity,name:li.title,shopify_product_id:String(li.product_id)};});
       const total=parseFloat(so.total_price)||0;
       if(!existing){
         const o={id:uid(),shopify_id:'#'+so.order_number,customer:so.shipping_address?.first_name||'',items,total,status:so.fulfillment_status==='fulfilled'?'fulfilled':'pending',created_at:so.created_at,fulfilled_at:so.fulfilled_at};
