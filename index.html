@@ -618,7 +618,14 @@ async function loadAll(){
 }
 
 function setLoading(msg){document.getElementById('loading-msg').textContent=msg;}
-function hideLoading(){document.getElementById('loading-screen').style.display='none';renderDash();}
+function hideLoading(){
+  document.getElementById('loading-screen').style.display='none';
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
+  document.getElementById('s-dash').classList.add('on');
+  document.getElementById('nb-dash').classList.add('on');
+  renderDash();
+}
 
 // ===================== LAGER DB =====================
 function getLagerKey(type, prodId){return prodId?type+'::'+prodId:type;}
@@ -768,7 +775,7 @@ function renderDash(){
 
   // Stats
   const nowM=now.getMonth(),nowY=now.getFullYear();
-  const mOrds=DB.orders.filter(o=>{const d=new Date(o.fulfilled_at||o.created_at);return o.status==='fulfilled'&&d.getMonth()===nowM&&d.getFullYear()===nowY;});
+  const mOrds=DB.orders.filter(o=>{const d=new Date(o.created_at);return d.getMonth()===nowM&&d.getFullYear()===nowY;});
   let prihod=0,profit=0;
   mOrds.forEach(o=>{const r=calcProfitPerOrder(o);prihod+=r.prihod;profit+=r.profit;});
   const totalRekl=DB.reklame.filter(r=>{const d=new Date(r.date);return d.getMonth()===nowM&&d.getFullYear()===nowY;}).reduce((a,b)=>a+(b.amount||0),0);
@@ -1130,14 +1137,27 @@ function renderFin(){
   const mo=currentFinMonth,yr=currentFinYear;
   const months=['Januar','Februar','Mart','April','Maj','Jun','Jul','Avgust','Septembar','Oktobar','Novembar','Decembar'];
   document.getElementById('fin-month-lbl').textContent=`${months[mo]} ${yr}`;
+  // Prihod = SVE narudzbine za taj mesec (i fulfilled i unfulfilled)
   const ords=DB.orders.filter(o=>{
-    if(o.status!=='fulfilled') return false;
-    const d=new Date(o.fulfilled_at||o.created_at);
+    const d=new Date(o.created_at);
     return d.getMonth()===mo&&d.getFullYear()===yr;
   });
+  // Za profit racunamo samo fulfilled (preuzete)
+  const fulfilledOrds=ords.filter(o=>o.status==='fulfilled');
   let totalPrihod=0,totalProfit=0;
   const byProd={};
-  ords.forEach(o=>{const r=calcProfitPerOrder(o);totalPrihod+=r.prihod;totalProfit+=r.profit;(o.items||[]).forEach(it=>{const pid=it.productId||it.product_id;if(!byProd[pid])byProd[pid]={qty:0};byProd[pid].qty+=(it.qty||1);});});
+  // Prihod = sve narudzbine tog meseca (ukupno naplaceno)
+  ords.forEach(o=>{
+    const r=calcProfitPerOrder(o);
+    totalPrihod+=r.prihod;
+    // Profit racunamo od svih (jer ce COD biti naplacen)
+    totalProfit+=r.profit;
+    (o.items||[]).forEach(it=>{
+      const pid=it.productId||it.product_id;
+      if(!byProd[pid])byProd[pid]={qty:0};
+      byProd[pid].qty+=(it.qty||1);
+    });
+  });
   const rekl=DB.reklame.filter(r=>{const d=new Date(r.date);return d.getMonth()===mo&&d.getFullYear()===yr;});
   const totalRekl=rekl.reduce((a,b)=>a+(b.amount||0),0);
   const finalProfit=totalProfit-totalRekl;
@@ -1566,11 +1586,13 @@ async function deleteIncoming(id){
 
 function exportCSV(){
   const mo=currentFinMonth,yr=currentFinYear;
+  // Prihod = SVE narudzbine za taj mesec (i fulfilled i unfulfilled)
   const ords=DB.orders.filter(o=>{
-    if(o.status!=='fulfilled') return false;
-    const d=new Date(o.fulfilled_at||o.created_at);
+    const d=new Date(o.created_at);
     return d.getMonth()===mo&&d.getFullYear()===yr;
   });
+  // Za profit racunamo samo fulfilled (preuzete)
+  const fulfilledOrds=ords.filter(o=>o.status==='fulfilled');
   let csv='Datum,Narudzbina,Kupac,Proizvod,Kolicina,Prihod RSD,Postarina RSD,Profit RSD\n';
   ords.forEach(o=>{const r=calcProfitPerOrder(o);(o.items||[]).forEach(it=>{const p=getProdById(it.productId||it.product_id);csv+=`${fmtDate(o.fulfilled_at||o.created_at)},${o.shopify_id||''},${o.customer||''},${p?p.name:'?'},${it.qty},${r.prihod},${r.postarina},${r.profit}\n`;});});
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
@@ -1580,7 +1602,6 @@ function exportCSV(){
 
 // ===================== INIT =====================
 loadAll().then(()=>{
-  renderDash();
   document.getElementById('ord-items-list').innerHTML='';
 }).catch(err=>{
   console.error('Load error:', err);
