@@ -396,7 +396,7 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
       <select class="fi" id="comp-prod-select"></select>
     </div>
     <div class="fg"><label>Količina <span id="comp-unit-lbl">(kom)</span></label><input class="fi" id="comp-qty" type="number" placeholder="10" min="0" step="0.1"></div>
-    <div class="fg"><label>Cena (RSD) — dodaje se kao rashod</label><input class="fi" id="comp-price" type="number" placeholder="0"></div>
+
     <div id="comp-deduct-info" class="alert info" style="display:none;margin-top:8px"></div>
     <div class="modal-btns">
       <button class="btn" onclick="closeModal('m-add-comp')">Otkaži</button>
@@ -981,17 +981,50 @@ function miniStat(lbl,val,unit,hl){return`<div style="background:var(--surface2)
 function renderLagProd(){
   if(!DB.products.length){document.getElementById('lag-prod').innerHTML=`<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg><p>Dodaj proizvode u Podešavanjima</p></div>`;return;}
   document.getElementById('lag-prod').innerHTML=DB.products.map(p=>{
-    const sklop=getLagerQty('sklopljene',p.id),gotova=getLagerQty('gotove',p.id),lica=getLagerQty('lica',p.id);
+    const sklop=getLagerQty('sklopljene',p.id),gotova=getLagerQty('gotove',p.id);
+    const lica=getLagerQty('lica',p.id),kut=getLagerQty('kutije_stamp',p.id);
     return`<div class="card">
       <div class="card-hdr"><span class="card-title">${p.name}</span></div>
-      <div class="flow-row"><div class="flow-phase"><div class="flow-name">Sklopljene kutije</div><div class="flow-sub">kutija + kabl + LED</div></div><div class="flow-count ${sklop>0?'green':''}">${sklop}</div><div class="flow-btns"><button class="btn xs primary" onclick="openSklop('sklopi','${p.id}')">+ Sklopi</button></div></div>
-      <div class="flow-row"><div class="flow-phase"><div class="flow-name">Gotove lampe</div><div class="flow-sub">+ lice zalepljeno</div></div><div class="flow-count ${gotova>0?'green':''}">${gotova}</div><div class="flow-btns"><button class="btn xs primary" onclick="openSklop('zalepi','${p.id}')">+ Zalepi</button></div></div>
+      <div class="flow-row">
+        <div class="flow-phase"><div class="flow-name">Lica</div><div class="flow-sub">štampana/UV</div></div>
+        <div class="flow-count ${lica>0?'green':'red'}">${lica}</div>
+        <div class="flow-btns"><button class="btn xs" onclick="openAddSingle('lica','${p.id}')">+ Dodaj</button></div>
+      </div>
+      <div class="flow-row">
+        <div class="flow-phase"><div class="flow-name">Kutije štampane</div><div class="flow-sub">3D print</div></div>
+        <div class="flow-count ${kut>0?'green':'red'}">${kut}</div>
+        <div class="flow-btns"><button class="btn xs" onclick="openAddSingle('kutije_stamp','${p.id}')">+ Dodaj</button></div>
+      </div>
+      <div class="flow-row">
+        <div class="flow-phase"><div class="flow-name">Sklopljene kutije</div><div class="flow-sub">kutija + kabl + LED</div></div>
+        <div class="flow-count ${sklop>0?'green':''}">${sklop}</div>
+        <div class="flow-btns"><button class="btn xs primary" onclick="openSklop('sklopi','${p.id}')">+ Sklopi</button></div>
+      </div>
+      <div class="flow-row">
+        <div class="flow-phase"><div class="flow-name">Gotove lampe</div><div class="flow-sub">sklopljena + lice</div></div>
+        <div class="flow-count ${gotova>0?'green':''}">${gotova}</div>
+        <div class="flow-btns"><button class="btn xs primary" onclick="openSklop('zalepi','${p.id}')">+ Zalepi</button></div>
+      </div>
       <div style="margin-top:10px;padding-top:10px;border-top:0.5px solid var(--border)">
         ${sklop>0&&lica>0?`<div class="alert ok" style="margin:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg><span>Možeš napraviti još <strong>${Math.min(sklop,lica)}</strong> gotovih!</span></div>`:''}
         ${gotova>0?`<div class="alert ok" style="margin:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg><span><strong>${gotova}</strong> gotovih čeka slanje</span></div>`:''}
       </div>
     </div>`;
   }).join('');
+}
+
+function openAddSingle(type, prodId){
+  sklopAction={action:'single', type, prodId};
+  const p=getProdById(prodId);
+  const names={lica:'Lica', kutije_stamp:'Kutije štampane'};
+  document.getElementById('m-sklop-title').textContent=`Dodaj ${names[type]||type} — ${p?p.name:''}`;
+  document.getElementById('m-sklop-body').innerHTML=`
+    <div class="alert info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <span>Dodaje se direktno na lager bez oduzimanja</span></div>
+    <div class="fg" style="margin-top:14px"><label>Količina</label><input class="fi" id="sklop-qty" type="number" value="1" min="1"></div>
+  `;
+  document.getElementById('m-sklop-confirm').disabled=false;
+  openModal('m-sklop');
 }
 
 function openSklop(action,prodId){
@@ -1003,12 +1036,12 @@ function openSklop(action,prodId){
   if(action==='sklopi'){
     const canDo=kut>0&&usb>=usbN&&led>=ledN;
     const maxQ=Math.min(kut,Math.floor(usb/usbN),Math.floor(led/ledN))||0;
-    document.getElementById('m-sklop-body').innerHTML=`<div class="alert ${canDo?'ok':'danger'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Skida: <strong>1 kutija + ${usbN} USB + ${ledN}m LED</strong></span></div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">${miniStat('Kutije',kut,'kom')}${miniStat('USB',usb,'kom')}${miniStat('LED',led,'m')}</div><div class="fg" style="margin-top:14px"><label>Količina (max ${maxQ})</label><input class="fi" id="sklop-qty" type="number" value="1" min="1" max="${maxQ}"></div>`;
+    document.getElementById('m-sklop-body').innerHTML=`<div class="alert ${canDo?'ok':'warn'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Skida: <strong>1 kutija + ${usbN} USB + ${ledN}m LED</strong></span></div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">${miniStat('Kutije',kut,'kom')}${miniStat('USB',usb,'kom')}${miniStat('LED',led,'m')}</div><div class="fg" style="margin-top:14px"><label>Količina</label><input class="fi" id="sklop-qty" type="number" value="1" min="1"></div><div class="switch-row" style="margin-top:8px"><div><div class="switch-label" style="font-size:13px">Ne skidaj lager (ručni unos)</div></div><input type="checkbox" id="sklop-no-deduct" style="width:20px;height:20px;cursor:pointer"></div>`;
     document.getElementById('m-sklop-confirm').disabled=!canDo;
   } else {
     const canDo=sklop>0&&lica>0;
     const maxQ=Math.min(sklop,lica)||0;
-    document.getElementById('m-sklop-body').innerHTML=`<div class="alert ${canDo?'ok':'danger'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Skida: <strong>1 sklopljena kutija + 1 lice</strong> → gotova lampa</span></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">${miniStat('Sklopljene',sklop,'kom')}${miniStat('Lica',lica,'kom')}</div><div class="fg" style="margin-top:14px"><label>Količina (max ${maxQ})</label><input class="fi" id="sklop-qty" type="number" value="1" min="1" max="${maxQ}"></div>`;
+    document.getElementById('m-sklop-body').innerHTML=`<div class="alert ${canDo?'ok':'warn'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Skida: <strong>1 sklopljena kutija + 1 lice</strong> → gotova lampa</span></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">${miniStat('Sklopljene',sklop,'kom')}${miniStat('Lica',lica,'kom')}</div><div class="fg" style="margin-top:14px"><label>Količina</label><input class="fi" id="sklop-qty" type="number" value="1" min="1"></div><div class="switch-row" style="margin-top:8px"><div><div class="switch-label" style="font-size:13px">Ne skidaj lager (ručni unos)</div></div><input type="checkbox" id="sklop-no-deduct" style="width:20px;height:20px;cursor:pointer"></div>`;
     document.getElementById('m-sklop-confirm').disabled=!canDo;
   }
   openModal('m-sklop');
@@ -1016,22 +1049,32 @@ function openSklop(action,prodId){
 
 async function confirmSklop(){
   if(!sklopAction)return;
-  const {action,prodId}=sklopAction;
+  const {action,prodId,type}=sklopAction;
   const qty=parseInt(document.getElementById('sklop-qty')?.value)||1;
-  const p=getProdById(prodId);if(!p)return;
+  const noDeduct=document.getElementById('sklop-no-deduct')?.checked||false;
+  const p=getProdById(prodId);
   document.getElementById('m-sklop-confirm').disabled=true;
   document.getElementById('m-sklop-confirm').innerHTML='<div class="spinner"></div>';
-  if(action==='sklopi'){
-    await deductLager('kutije_stamp',qty,prodId);
-    await deductLager('usb',(p.usb||1)*qty);
-    await deductLager('led',(p.led||1)*qty);
+
+  if(action==='single'){
+    // Just add to lager, no deduction
+    await addLager(type,qty,prodId);
+    toast(`✓ Dodano ${qty} na lager`);
+  } else if(action==='sklopi'){
+    if(!noDeduct && p){
+      await deductLager('kutije_stamp',qty,prodId);
+      await deductLager('usb',(p.usb||1)*qty);
+      await deductLager('led',(p.led||1)*qty);
+    }
     await addLager('sklopljene',qty,prodId);
-    toast(`✓ Sklopljeno ${qty} kutija`);
+    toast(noDeduct?`✓ Dodano ${qty} sklopljenih (bez oduzimanja)`:`✓ Sklopljeno ${qty} kutija`);
   } else {
-    await deductLager('sklopljene',qty,prodId);
-    await deductLager('lica',qty,prodId);
+    if(!noDeduct){
+      await deductLager('sklopljene',qty,prodId);
+      await deductLager('lica',qty,prodId);
+    }
     await addLager('gotove',qty,prodId);
-    toast(`✓ ${qty} gotovih lampi!`);
+    toast(noDeduct?`✓ Dodano ${qty} gotovih (bez oduzimanja)`:`✓ ${qty} gotovih lampi!`);
   }
   closeModal('m-sklop');renderLag();renderDash();
   document.getElementById('m-sklop-confirm').disabled=false;
@@ -1233,7 +1276,7 @@ async function doSync(){
     // Povuci fulfilled narudzbine za ovaj mesec (za prihod)
     const monthStart=new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString();
     try{
-      const fulfilledResp=await fetch('https://softverzalampe.vercel.app/api/shopify?'+new URLSearchParams({path:'orders.json',status:'any',fulfillment_status:'shipped',created_at_min:monthStart,limit:'250'}).toString(),{headers:{'X-Shopify-URL':url,'X-Shopify-Token':token}});
+      const fulfilledResp=await fetch('https://softverzalampe.vercel.app/api/shopify?'+new URLSearchParams({path:'orders.json',status:'any',created_at_min:monthStart,limit:'250'}).toString(),{headers:{'X-Shopify-URL':url,'X-Shopify-Token':token}});
       if(fulfilledResp.ok){
         const fd=await fulfilledResp.json();
         for(const so of (fd.orders||[])){
