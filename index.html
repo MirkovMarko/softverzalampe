@@ -224,8 +224,9 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
     </button>
   </div>
   <div class="tabs">
-    <button class="tab on" onclick="filterOrds('pending',this)">Na čekanju</button>
-    <button class="tab" onclick="filterOrds('ready',this)">Spremno</button>
+    <button class="tab on" onclick="filterOrds('ready',this)">✅ Spreman</button>
+    <button class="tab" onclick="filterOrds('has_material',this)">🟡 Ima delova</button>
+    <button class="tab" onclick="filterOrds('missing',this)">🔴 Fali</button>
     <button class="tab" onclick="filterOrds('all',this)">Sve</button>
   </div>
   <div id="ord-list"></div>
@@ -303,6 +304,23 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
 
   <div class="sec-lbl">Limiti upozorenja</div>
   <div id="comp-limits-list"></div>
+
+  <div class="sec-lbl">Reset podataka</div>
+  <div class="card">
+    <div style="font-size:13px;color:var(--text2);margin-bottom:14px">Briše sve podatke iz te kategorije — nepovratno!</div>
+    <button class="btn full danger-btn" style="margin-bottom:10px" onclick="resetData('orders')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+      Obriši sve narudžbine
+    </button>
+    <button class="btn full danger-btn" style="margin-bottom:10px" onclick="resetData('lager')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+      Resetuj lager na nulu
+    </button>
+    <button class="btn full danger-btn" style="margin-bottom:10px" onclick="resetData('finansije')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+      Obriši finansije (rashodi + reklame)
+    </button>
+  </div>
 </div>
 
 <!-- NAV -->
@@ -928,17 +946,34 @@ function compRowHTML(name,qty,unit,limit){
 // ===================== ORDERS =====================
 function renderOrds(){
   const all=DB.orders.filter(o=>o.status!=='fulfilled');
-  const pending=all.filter(o=>o.status==='pending'||o.status==='processing');
-  const ready=all.filter(o=>o.status==='ready');
-  const unfulfilled=DB.orders.filter(o=>o.status!=='fulfilled');
-  let show=ordFilter==='pending'?pending:ordFilter==='ready'?ready:unfulfilled;
-  document.getElementById('ord-sub').textContent=`${pending.length} na čekanju · ${ready.length} spremo`;
+  const ready=all.filter(o=>getOrderMaterialStatus(o)==='ready'||o.status==='ready');
+  const hasMaterial=all.filter(o=>getOrderMaterialStatus(o)==='has_material');
+  const missing=all.filter(o=>getOrderMaterialStatus(o)==='missing');
+
+  let show;
+  if(ordFilter==='ready') show=ready;
+  else if(ordFilter==='has_material') show=hasMaterial;
+  else if(ordFilter==='missing') show=missing;
+  else{
+    // All - sort: ready first, then has_material, then missing
+    show=[...ready,...hasMaterial,...missing];
+  }
+  document.getElementById('ord-sub').textContent=`✅ ${ready.length} · 🟡 ${hasMaterial.length} · 🔴 ${missing.length}`;
   document.getElementById('ord-list').innerHTML=show.length===0
     ?`<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg><p>Nema narudžbina</p></div>`
     :show.map(o=>renderOrderCard(o,false)).join('');
 }
 
 function filterOrds(f,el){ordFilter=f;document.querySelectorAll('#s-ord .tab').forEach(t=>t.classList.remove('on'));el.classList.add('on');renderOrds();}
+
+function getOrderMaterialStatus(order){
+  const r=getOrderReadiness(order);
+  if(order.status==='ready') return 'ready';
+  if(r.canFulfill) return 'ready';
+  const allHaveSomething = r.items.every(i=>i.status==='need_glue'||i.status==='need_assembly'||i.status==='ready');
+  if(allHaveSomething) return 'has_material';
+  return 'missing';
+}
 
 function renderOrderCard(order,compact){
   const r=getOrderReadiness(order);
@@ -948,7 +983,9 @@ function renderOrderCard(order,compact){
   let readHTML='';
   if(!compact){r.items.forEach(ri=>{const clrs={ready:'ok',need_glue:'warn',need_assembly:'info',missing:'danger'};readHTML+=`<div class="alert ${clrs[ri.status]||'info'}" style="margin:4px 0;padding:8px 12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg><span><strong>${ri.pName} ×${ri.needed}:</strong> ${ri.hint}</span></div>`;});}
   const {prihod,profit}=calcProfitPerOrder(order);
-  return `<div class="ord-card">
+  const matStatus = getOrderMaterialStatus(order);
+  const borderColor = matStatus==='ready'?'var(--green)':matStatus==='has_material'?'var(--warn)':'var(--red)';
+  return `<div class="ord-card" style="border-left:3px solid ${borderColor}">
     <div class="ord-head"><div><div class="ord-name">${order.shopify_id||'#—'} ${order.customer?'· '+order.customer:''}</div><div class="ord-meta">${fmtDate(order.created_at)} · ${fmt(prihod)} RSD</div></div><span class="badge ${sc}">${sl}</span></div>
     <div class="ord-body"><div>${itemsHTML}</div>${readHTML}</div>
     <div class="ord-status-bar">
@@ -1727,6 +1764,43 @@ async function deleteIncoming(id){
   await sb.delete('incoming','id=eq.'+id);
   DB.incoming = DB.incoming.filter(x=>x.id!==id);
   renderLag();
+}
+
+// ===================== RESET =====================
+async function resetData(type){
+  const msgs={
+    orders:'Ovo će obrisati SVE narudžbine. Siguran?',
+    lager:'Ovo će resetovati ceo lager na nulu. Siguran?',
+    finansije:'Ovo će obrisati sve rashode i reklame. Siguran?'
+  };
+  if(!confirm(msgs[type])) return;
+  if(type==='orders'){
+    await sb.delete('orders','id=neq.0');
+    DB.orders=[];
+    toast('✓ Sve narudžbine obrisane');
+    renderOrds();renderDash();
+  } else if(type==='lager'){
+    // Reset all lager to 0
+    const keys=await sb.get('lager');
+    for(const row of (keys||[])){
+      await sb.update('lager','key=eq.'+encodeURIComponent(row.key),{value:0});
+    }
+    DB.lager={usb:0,led:0,karton:0,lica:{},kutije_stamp:{},sklopljene:{},gotove:{}};
+    DB.products.forEach(p=>{
+      DB.lager.lica[p.id]=0;
+      DB.lager.kutije_stamp[p.id]=0;
+      DB.lager.sklopljene[p.id]=0;
+      DB.lager.gotove[p.id]=0;
+    });
+    toast('✓ Lager resetovan na nulu');
+    renderLag();renderDash();
+  } else if(type==='finansije'){
+    await sb.delete('costs','id=neq.0');
+    await sb.delete('reklame','id=neq.0');
+    DB.costs=[];DB.reklame=[];
+    toast('✓ Finansije obrisane');
+    renderFin();renderDash();
+  }
 }
 
 function exportCSV(){
