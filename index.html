@@ -616,7 +616,7 @@ async function loadAll(){
 }
 
 function setLoading(msg){document.getElementById('loading-msg').textContent=msg;}
-function hideLoading(){document.getElementById('loading-screen').style.display='none';}
+function hideLoading(){document.getElementById('loading-screen').style.display='none';renderDash();}
 
 // ===================== LAGER DB =====================
 function getLagerKey(type, prodId){return prodId?type+'::'+prodId:type;}
@@ -1519,6 +1519,10 @@ function exportCSV(){
 loadAll().then(()=>{
   renderDash();
   document.getElementById('ord-items-list').innerHTML='';
+}).catch(err=>{
+  console.error('Load error:', err);
+  document.getElementById('loading-screen').style.display='none';
+  renderDash();
 });
 </script>
 </body>
