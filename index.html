@@ -775,7 +775,7 @@ function renderDash(){
 
   // Stats
   const nowM=now.getMonth(),nowY=now.getFullYear();
-  const mOrds=DB.orders.filter(o=>{const d=new Date(o.created_at);return d.getMonth()===nowM&&d.getFullYear()===nowY;});
+  const mOrds=DB.orders.filter(o=>{if(o.status==='cancelled'||o.cancel_reason) return false;const d=new Date(o.created_at);return d.getMonth()===nowM&&d.getFullYear()===nowY;});
   let prihod=0,profit=0;
   mOrds.forEach(o=>{const r=calcProfitPerOrder(o);prihod+=r.prihod;profit+=r.profit;});
   const totalRekl=DB.reklame.filter(r=>{const d=new Date(r.date);return d.getMonth()===nowM&&d.getFullYear()===nowY;}).reduce((a,b)=>a+(b.amount||0),0);
@@ -1137,8 +1137,9 @@ function renderFin(){
   const mo=currentFinMonth,yr=currentFinYear;
   const months=['Januar','Februar','Mart','April','Maj','Jun','Jul','Avgust','Septembar','Oktobar','Novembar','Decembar'];
   document.getElementById('fin-month-lbl').textContent=`${months[mo]} ${yr}`;
-  // Prihod = SVE narudzbine za taj mesec (i fulfilled i unfulfilled)
+  // Prihod = SVE narudzbine za taj mesec osim otkazanih
   const ords=DB.orders.filter(o=>{
+    if(o.status==='cancelled'||o.cancel_reason) return false;
     const d=new Date(o.created_at);
     return d.getMonth()===mo&&d.getFullYear()===yr;
   });
@@ -1586,8 +1587,9 @@ async function deleteIncoming(id){
 
 function exportCSV(){
   const mo=currentFinMonth,yr=currentFinYear;
-  // Prihod = SVE narudzbine za taj mesec (i fulfilled i unfulfilled)
+  // Prihod = SVE narudzbine za taj mesec osim otkazanih
   const ords=DB.orders.filter(o=>{
+    if(o.status==='cancelled'||o.cancel_reason) return false;
     const d=new Date(o.created_at);
     return d.getMonth()===mo&&d.getFullYear()===yr;
   });
