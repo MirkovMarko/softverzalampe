@@ -450,58 +450,6 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
   </div>
 </div>
 
-<!-- VRAĆENE LAMPE MODAL -->
-<div id="m-add-return" class="overlay">
-  <div class="modal">
-    <div class="modal-bar"></div>
-    <h2>Vraćena lampa</h2>
-    <div class="fg"><label>Proizvod</label><select class="fi" id="ret-prod"></select></div>
-    <div class="fg"><label>Količina</label><input class="fi" id="ret-qty" type="number" value="1" min="1"></div>
-    <div class="fg"><label>Datum vraćanja</label><input class="fi" id="ret-date" type="date"></div>
-    <div class="fg"><label>Napomena (opciono)</label><input class="fi" id="ret-note" placeholder="npr. oštećena, nije preuzeta..."></div>
-    <div class="alert info" style="margin-top:4px">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      <span>Vraćena lampa se automatski dodaje na lager kao gotova lampa</span>
-    </div>
-    <div class="modal-btns">
-      <button class="btn" onclick="closeModal('m-add-return')">Otkaži</button>
-      <button class="btn primary" onclick="saveReturn()">Sačuvaj</button>
-    </div>
-  </div>
-</div>
-
-<!-- NARUČENO (NA PUTU) MODAL -->
-<div id="m-add-incoming" class="overlay">
-  <div class="modal">
-    <div class="modal-bar"></div>
-    <h2>Naručio sam</h2>
-    <div class="fg">
-      <label>Šta sam naručio</label>
-      <select class="fi" id="inc-type" onchange="onIncTypeChange()">
-        <option value="usb">USB kablovi</option>
-        <option value="led">LED traka</option>
-        <option value="karton">Kutije za pakovanje</option>
-        <option value="lica">Lica (štampana)</option>
-        <option value="kutije_stamp">Kutije štampane (3D)</option>
-      </select>
-    </div>
-    <div class="fg" id="inc-prod-wrap" style="display:none">
-      <label>Proizvod</label>
-      <select class="fi" id="inc-prod"></select>
-    </div>
-    <div class="fi-row">
-      <div class="fg"><label>Količina <span id="inc-unit">(kom)</span></label><input class="fi" id="inc-qty" type="number" placeholder="60" min="1" step="0.1" oninput="calcUnitPrice()"></div>
-      <div class="fg"><label>Ukupno plaćeno (RSD)</label><input class="fi" id="inc-total-price" type="number" placeholder="7200" oninput="calcUnitPrice()"></div>
-    </div>
-    <div class="fg"><label>Cena po komadu (auto)</label><input class="fi" id="inc-unit-price" type="number" placeholder="120" readonly style="background:var(--surface2)"></div>
-    <div class="fg"><label>Napomena</label><input class="fi" id="inc-note" placeholder="opciono"></div>
-    <div class="modal-btns">
-      <button class="btn" onclick="closeModal('m-add-incoming')">Otkaži</button>
-      <button class="btn primary" onclick="saveIncoming()">Naručio sam</button>
-    </div>
-  </div>
-</div>
-
 <div id="m-add-cost" class="overlay">
   <div class="modal">
     <div class="modal-bar"></div>
@@ -574,7 +522,7 @@ let ordFilter='pending', lagTabCurrent='comp', sklopAction=null;
 // ===================== LOAD FROM SUPABASE =====================
 async function loadAll(){
   setLoading('Učitavam narudžbine...');
-  const [orders, products, costs, reklame, lagerRows, settingsRows, limitsRows, returnsData, incomingData] = await Promise.all([
+  const [orders, products, costs, reklame, lagerRows, settingsRows, limitsRows] = await Promise.all([
     sb.get('orders','order=created_at.desc'),
     sb.get('products','order=name.asc'),
     sb.get('costs','order=date.desc'),
@@ -582,13 +530,9 @@ async function loadAll(){
     sb.get('lager'),
     sb.get('settings'),
     sb.get('comp_limits'),
-    sb.get('returns','order=date.desc'),
-    sb.get('incoming','order=ordered_at.desc'),
   ]);
 
   DB.orders = (orders||[]).map(o=>({...o, items: typeof o.items === 'string' ? JSON.parse(o.items||'[]') : (o.items||[])}));
-  DB.returns = returnsData||[];
-  DB.incoming = incomingData||[];
   DB.products = products||[];
   DB.costs = costs||[];
   DB.reklame = reklame||[];
@@ -675,24 +619,6 @@ function calcProfitPerOrder(order){
     if(p) matCost += calcCostPerLamp(p)*(it.qty||1);
   });
   return {profit: lampRevenue-matCost, prihod:total, matCost, postarina};
-}
-
-function getReturnedQtyForMonth(productId, month, year){
-  return (DB.returns||[]).filter(r=>{
-    const d=new Date(r.date);
-    return r.product_id===productId && d.getMonth()===month && d.getFullYear()===year;
-  }).reduce((a,b)=>a+(b.qty||1),0);
-}
-
-function getMonthReturnsStats(month, year){
-  const rets = (DB.returns||[]).filter(r=>{const d=new Date(r.date);return d.getMonth()===month&&d.getFullYear()===year;});
-  const totalQty = rets.reduce((a,b)=>a+(b.qty||1),0);
-  const totalValue = rets.reduce((a,b)=>{
-    const p=getProdById(b.product_id);
-    const price = p?(p.price||0)+(DB.settings.postarina||390):0;
-    return a+price*(b.qty||1);
-  },0);
-  return {totalQty, totalValue, rets};
 }
 
 function checkLagerAlerts(){
@@ -792,14 +718,6 @@ function renderDash(){
   DB.products.forEach(p=>{const g=getLagerQty('gotove',p.id);if(g>0)lagHTML+=`<div class="comp-row"><div class="comp-left"><div class="comp-name">${p.name}</div><div class="comp-detail">Gotovih lampi</div></div><div class="comp-right"><div class="comp-qty comp-ok">${g}</div><div class="comp-unit">kom</div></div></div>`;});
   lagHTML+='</div>';
   document.getElementById('dash-lager-quick').innerHTML=lagHTML;
-}
-
-function compRowHTMLInc(name,qty,unit,limit,incoming){
-  const clr=qty<=0?'comp-low':qty<=limit?'comp-warn':'comp-ok';
-  const prog=Math.min(100,(qty/(limit*2))*100);
-  const pc=qty<=0?'red':qty<=limit?'warn':'green';
-  const incBadge = incoming>0?`<span style="font-size:11px;color:var(--blue);margin-left:6px">(+${incoming} na putu)</span>`:'';
-  return `<div class="comp-row"><div class="comp-left"><div class="comp-name">${name}${incBadge}</div><div class="prog"><div class="prog-fill ${pc}" style="width:${prog}%"></div></div></div><div class="comp-right"><div class="comp-qty ${clr}">${qty}</div><div class="comp-unit">${unit}</div></div></div>`;
 }
 
 function compRowHTML(name,qty,unit,limit){
@@ -924,44 +842,11 @@ function lagTab(t,el){lagTabCurrent=t;document.querySelectorAll('#s-lag .tab').f
 
 function renderLag(){lagTabCurrent==='comp'?renderLagComp():renderLagProd();}
 
-function getIncomingByType(type, prodId){
-  return (DB.incoming||[]).filter(x=>!x.arrived&&x.type===type&&(prodId?x.product_id===prodId:true));
-}
-function incomingQty(type, prodId){
-  return getIncomingByType(type,prodId).reduce((a,b)=>a+(b.qty||0),0);
-}
-
 function renderLagComp(){
   const usb=DB.lager.usb||0,led=DB.lager.led||0,karton=DB.lager.karton||0;
   const ul=DB.compLimits?.usb||20,ll=DB.compLimits?.led||20,kl=DB.compLimits?.karton||10;
-  const usbInc=incomingQty('usb'),ledInc=incomingQty('led'),kartonInc=incomingQty('karton');
-
-  let html=`<div class="card" style="padding:12px 16px"><div class="card-hdr"><span class="card-title">Sirovine</span><div style="display:flex;gap:6px"><button class="btn xs" onclick="openIncomingModal()">+ Naručio sam</button><button class="btn xs" onclick="openModal('m-add-comp')">+ Stiglo</button></div></div>`;
-  html+=compRowHTMLInc('USB kablovi',usb,'kom',ul,usbInc)+compRowHTMLInc('LED traka',led,'m',ll,ledInc)+compRowHTMLInc('Kutije za pakovanje',karton,'kom',kl,kartonInc);
-
-  // Show pending incoming
-  const pending = (DB.incoming||[]).filter(x=>!x.arrived);
-  if(pending.length>0){
-    html+=`<div style="margin-top:12px;padding-top:12px;border-top:0.5px solid var(--border)">`;
-    html+=`<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Na putu 🚚</div>`;
-    const names={usb:'USB kablovi',led:'LED traka',karton:'Kutije za pakovanje',lica:'Lica',kutije_stamp:'Kutije štampane'};
-    pending.forEach(inc=>{
-      const p = inc.product_id?getProdById(inc.product_id):null;
-      const lbl = (names[inc.type]||inc.type)+(p?' — '+p.name:'');
-      html+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid var(--border)">
-        <div>
-          <div style="font-size:13px;font-weight:500">${lbl}</div>
-          <div style="font-size:11px;color:var(--text3)">${inc.qty} kom · ${inc.unit_price?fmt(inc.unit_price)+' RSD/kom':'cena nije unesena'}</div>
-        </div>
-        <div style="display:flex;gap:6px;align-items:center">
-          <button class="btn xs primary" onclick="markIncomingArrived('${inc.id}')">Stiglo ✓</button>
-          <button class="btn xs ghost" onclick="deleteIncoming('${inc.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="13" height="13"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-        </div>
-      </div>`;
-    });
-    html+=`</div>`;
-  }
-
+  let html=`<div class="card" style="padding:12px 16px"><div class="card-hdr"><span class="card-title">Sirovine</span><button class="btn xs" onclick="openModal('m-add-comp')">+ Dodaj</button></div>`;
+  html+=compRowHTML('USB kablovi',usb,'kom',ul)+compRowHTML('LED traka',led,'m',ll)+compRowHTML('Kutije za pakovanje',karton,'kom',kl);
   html+='</div>';
   if(DB.products.length>0){
     html+='<div class="card" style="padding:12px 16px"><div class="card-hdr"><span class="card-title">Po proizvodu</span></div>';
@@ -1092,48 +977,12 @@ function renderFin(){
   const totalRekl=rekl.reduce((a,b)=>a+(b.amount||0),0);
   const finalProfit=totalProfit-totalRekl;
 
-  const retStats2 = getMonthReturnsStats(mo,yr);
-  const realProfit = finalProfit - retStats2.totalValue;
-
-  let html=`<div class="profit-big"><div><div class="profit-big-lbl">Krajnji profit</div><div style="font-size:13px;color:var(--green-mid)">profit − reklame − vraćene</div></div><div class="profit-big-val">${fmt(realProfit)} <span style="font-size:16px;color:var(--green-mid)">RSD</span></div></div>`;
+  let html=`<div class="profit-big"><div><div class="profit-big-lbl">Krajnji profit</div><div style="font-size:13px;color:var(--green-mid)">profit − reklame</div></div><div class="profit-big-val">${fmt(finalProfit)} <span style="font-size:16px;color:var(--green-mid)">RSD</span></div></div>`;
   html+=`<div class="stats2"><div class="stat-card"><div class="stat-lbl">Prihod</div><div class="stat-num">${fmt(totalPrihod)}<small> RSD</small></div></div><div class="stat-card"><div class="stat-lbl">Profit (bruto)</div><div class="stat-num green">${fmt(totalProfit)}<small> RSD</small></div></div><div class="stat-card"><div class="stat-lbl">Reklame</div><div class="stat-num red">−${fmt(totalRekl)}<small> RSD</small></div></div><div class="stat-card"><div class="stat-lbl">Narudžbine</div><div class="stat-num blue">${ords.length}<small> kom</small></div></div></div>`;
 
   if(totalRekl>0){const roas=totalPrihod/totalRekl,cpa=totalRekl/Math.max(ords.length,1);html+=`<div class="card"><div class="card-hdr"><span class="card-title">Efikasnost reklama</span></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div><div style="font-size:12px;color:var(--text2);margin-bottom:3px">ROAS</div><div style="font-size:26px;font-weight:700;color:${roas>=3?'var(--green)':'var(--warn)'}">${roas.toFixed(2)}</div></div><div><div style="font-size:12px;color:var(--text2);margin-bottom:3px">CPA</div><div style="font-size:26px;font-weight:700;">${fmt(cpa)} <span style="font-size:14px;color:var(--text2)">RSD</span></div></div></div></div>`;}
 
-  if(Object.keys(byProd).length>0){
-    html+=`<div class="card"><div class="card-hdr"><span class="card-title">Po proizvodu</span></div><table class="fin-table"><thead><tr><th>Proizvod</th><th style="text-align:right">Prodato</th><th style="text-align:right">Vraćeno</th><th style="text-align:right">Neto</th></tr></thead><tbody>`;
-    Object.entries(byProd).forEach(([pid,d])=>{
-      const p=getProdById(pid);
-      const ret=getReturnedQtyForMonth(pid,mo,yr);
-      const neto=d.qty-ret;
-      html+=`<tr><td>${p?p.name:'?'}</td><td class="num">${d.qty}</td><td class="num" style="color:var(--red)">${ret>0?'-'+ret:0}</td><td class="num" style="font-weight:700">${neto}</td></tr>`;
-    });
-    html+=`</tbody></table></div>`;
-  }
-
-  // Returns for this month
-  const retStats = getMonthReturnsStats(mo,yr);
-  const adjustedProfit = totalProfit - retStats.totalValue;
-
-  if(retStats.totalQty>0){
-    html+=`<div class="alert warn" style="margin-bottom:14px">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      <span><strong>${retStats.totalQty} vraćenih lampi</strong> — oduzeto ${fmt(retStats.totalValue)} RSD od profita</span>
-    </div>`;
-  }
-
-  html+=`<div style="display:flex;align-items:center;justify-content:space-between" class="sec-lbl"><span>Vraćene lampe</span><button class="btn xs" onclick="openReturnModal()">+ Dodaj povrat</button></div>`;
-  const monthRets = (DB.returns||[]).filter(r=>{const d=new Date(r.date);return d.getMonth()===mo&&d.getFullYear()===yr;});
-  if(monthRets.length>0){
-    html+=`<div class="card" style="padding:12px 16px">`;
-    monthRets.forEach(r=>{
-      const p=getProdById(r.product_id);
-      html+=`<div class="rekl-row"><div><div style="font-size:14px;font-weight:500">${p?p.name:'?'} ×${r.qty}</div><div style="font-size:12px;color:var(--text3)">${fmtDate(r.date)} ${r.note?'· '+r.note:''}</div></div><div style="display:flex;align-items:center;gap:8px"><span class="badge green">Na lageru</span><button class="btn xs ghost" onclick="deleteReturn('${r.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="13" height="13"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div></div>`;
-    });
-    html+=`</div>`;
-  } else {
-    html+=`<div style="font-size:13px;color:var(--text3);margin-bottom:14px">Nema vraćenih lampi ovaj mesec</div>`;
-  }
+  if(Object.keys(byProd).length>0){html+=`<div class="card"><div class="card-hdr"><span class="card-title">Po proizvodu</span></div><table class="fin-table"><thead><tr><th>Proizvod</th><th style="text-align:right">Kom</th></tr></thead><tbody>`;Object.entries(byProd).forEach(([pid,d])=>{const p=getProdById(pid);html+=`<tr><td>${p?p.name:'?'}</td><td class="num">${d.qty}</td></tr>`;});html+=`</tbody></table></div>`;}
 
   html+=`<div style="display:flex;align-items:center;justify-content:space-between" class="sec-lbl"><span>Reklame</span><button class="btn xs" onclick="openMetaModal()">+ Unesi</button></div>`;
   if(rekl.length===0){html+=`<div class="alert warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Nema reklama za ovaj mesec</span></div>`;}
@@ -1363,146 +1212,6 @@ async function saveProd(){
   if(editId){const idx=DB.products.findIndex(p=>p.id===editId);if(idx>=0)DB.products[idx]=prod;}
   else{DB.products.push(prod);await sb.upsert('lager',[{key:'lica::'+prod.id,value:0},{key:'kutije_stamp::'+prod.id,value:0},{key:'sklopljene::'+prod.id,value:0},{key:'gotove::'+prod.id,value:0}]);DB.lager.lica[prod.id]=0;DB.lager.kutije_stamp[prod.id]=0;DB.lager.sklopljene[prod.id]=0;DB.lager.gotove[prod.id]=0;}
   closeModal('m-add-prod');renderSet();renderLag();toast('✓ Proizvod sačuvan');
-}
-
-// ===================== VRAĆENE LAMPE =====================
-function openReturnModal(){
-  const sel = document.getElementById('ret-prod');
-  sel.innerHTML = DB.products.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
-  document.getElementById('ret-date').value = today();
-  document.getElementById('ret-qty').value = 1;
-  document.getElementById('ret-note').value = '';
-  openModal('m-add-return');
-}
-
-async function saveReturn(){
-  const productId = document.getElementById('ret-prod').value;
-  const qty = parseInt(document.getElementById('ret-qty').value)||1;
-  const date = document.getElementById('ret-date').value||today();
-  const note = document.getElementById('ret-note').value;
-  if(!productId){toast('Izaberi proizvod');return;}
-
-  const ret = {id:uid(), product_id:productId, qty, date, note, added_to_lager:true};
-  await sb.upsert('returns',[ret]);
-  DB.returns.unshift(ret);
-
-  // Dodaj na lager kao gotovu lampu
-  await addLager('gotove', qty, productId);
-
-  closeModal('m-add-return');
-  renderFin();renderDash();renderLag();
-  toast(`✓ ${qty} lampa vraćena → dodana na lager kao gotova`);
-}
-
-async function deleteReturn(id){
-  if(!confirm('Obriši povrat?')) return;
-  const ret = DB.returns.find(r=>r.id===id);
-  if(ret){
-    // Skini sa lagera
-    await deductLager('gotove', ret.qty||1, ret.product_id);
-  }
-  await sb.delete('returns','id=eq.'+id);
-  DB.returns = DB.returns.filter(r=>r.id!==id);
-  renderFin();renderDash();
-}
-
-// ===================== NARUČENO (NA PUTU) =====================
-function openIncomingModal(){
-  const sel = document.getElementById('inc-prod');
-  sel.innerHTML = DB.products.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
-  document.getElementById('inc-qty').value='';
-  document.getElementById('inc-total-price').value='';
-  document.getElementById('inc-unit-price').value='';
-  document.getElementById('inc-note').value='';
-  onIncTypeChange();
-  openModal('m-add-incoming');
-}
-
-function onIncTypeChange(){
-  const type = document.getElementById('inc-type').value;
-  const prodNeeded = ['lica','kutije_stamp'];
-  document.getElementById('inc-prod-wrap').style.display = prodNeeded.includes(type)?'':'none';
-  const units = {usb:'(kom)',led:'(m — metri)',karton:'(kom)',lica:'(kom)',kutije_stamp:'(kom)'};
-  document.getElementById('inc-unit').textContent = units[type]||'(kom)';
-}
-
-function calcUnitPrice(){
-  const qty = parseFloat(document.getElementById('inc-qty').value)||0;
-  const total = parseFloat(document.getElementById('inc-total-price').value)||0;
-  if(qty>0&&total>0) document.getElementById('inc-unit-price').value = Math.round(total/qty);
-  else document.getElementById('inc-unit-price').value='';
-}
-
-async function saveIncoming(){
-  const type = document.getElementById('inc-type').value;
-  const qty = parseFloat(document.getElementById('inc-qty').value)||0;
-  const totalPrice = parseFloat(document.getElementById('inc-total-price').value)||0;
-  const unitPrice = parseFloat(document.getElementById('inc-unit-price').value)||0;
-  const note = document.getElementById('inc-note').value;
-  const prodId = document.getElementById('inc-prod').value||null;
-  if(!qty){toast('Unesi količinu');return;}
-
-  const inc = {id:uid(), type, product_id:prodId, qty, total_price:totalPrice, unit_price:unitPrice, ordered_at:today(), arrived:false, note};
-  await sb.upsert('incoming',[inc]);
-  DB.incoming.unshift(inc);
-
-  // Ako nema cenu dostave, dodaj rashod
-  if(totalPrice>0){
-    const names={usb:'USB kablovi',led:'LED traka',karton:'Kutije za pakovanje',lica:'Lica',kutije_stamp:'Kutije štampane'};
-    const cost={id:uid(),cat:'material',descr:names[type]+' (naručeno)',amount:totalPrice,date:today()};
-    await sb.upsert('costs',[cost]);
-    DB.costs.unshift(cost);
-  }
-
-  closeModal('m-add-incoming');
-  renderLag();renderDash();
-  toast('✓ Zabeleženo — prikazuje se na lageru kad stigne');
-}
-
-async function markIncomingArrived(id){
-  const inc = DB.incoming.find(x=>x.id===id);
-  if(!inc) return;
-  inc.arrived = true;
-  inc.arrived_at = today();
-  await sb.update('incoming','id=eq.'+id,{arrived:true, arrived_at:today()});
-
-  // Dodaj na lager
-  await addLager(inc.type, inc.qty, inc.product_id||undefined);
-
-  // Ažuriraj cenu komponente u proizvodu ako je USB ili LED
-  if(inc.unit_price>0){
-    if(inc.type==='usb'){
-      DB.products.forEach(async p=>{
-        if(!p.usb_cost||p.usb_cost===0){
-          p.usb_cost = inc.unit_price;
-          await sb.upsert('products',[p]);
-        }
-      });
-    } else if(inc.type==='led'){
-      DB.products.forEach(async p=>{
-        if(!p.led_cost||p.led_cost===0){
-          p.led_cost = inc.unit_price;
-          await sb.upsert('products',[p]);
-        }
-      });
-    } else if(inc.type==='karton'){
-      DB.products.forEach(async p=>{
-        if(!p.karton_cost||p.karton_cost===0){
-          p.karton_cost = inc.unit_price;
-          await sb.upsert('products',[p]);
-        }
-      });
-    }
-  }
-
-  renderLag();renderDash();
-  toast(`✓ Stiglo! ${inc.qty} ${inc.type} dodano na lager`);
-}
-
-async function deleteIncoming(id){
-  await sb.delete('incoming','id=eq.'+id);
-  DB.incoming = DB.incoming.filter(x=>x.id!==id);
-  renderLag();
 }
 
 function exportCSV(){
