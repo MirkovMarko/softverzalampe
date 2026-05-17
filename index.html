@@ -210,8 +210,6 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
   <div class="stats2" id="dash-stats"></div>
   <div class="sec-lbl">Produkcijski plan</div>
   <div id="dash-prod-plan"></div>
-  <div class="sec-lbl">Čeka obradu</div>
-  <div id="dash-orders"></div>
   <div class="sec-lbl">Lager — brzo</div>
   <div id="dash-lager-quick"></div>
 </div>
@@ -400,6 +398,10 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
     <div class="fg"><label>Količina <span id="comp-unit-lbl">(kom)</span></label><input class="fi" id="comp-qty" type="number" placeholder="10" min="0" step="0.1"></div>
 
     <div id="comp-deduct-info" class="alert info" style="display:none;margin-top:8px"></div>
+    <div class="switch-row" style="margin-top:8px">
+      <div><div class="switch-label" style="font-size:13px">Ne skidaj sa lagera</div><div style="font-size:11px;color:var(--text2)">Za ručni unos početnog stanja</div></div>
+      <input type="checkbox" id="comp-no-deduct" style="width:20px;height:20px;cursor:pointer">
+    </div>
     <div class="modal-btns">
       <button class="btn" onclick="closeModal('m-add-comp')">Otkaži</button>
       <button class="btn primary" onclick="saveComp()">Dodaj</button>
@@ -413,7 +415,7 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
     <h2 id="m-prod-title">Novi proizvod</h2>
     <div class="fg"><label>Naziv</label><input class="fi" id="prod-name" placeholder="Lampa Partizan"></div>
     <div class="fg"><label>Shopify Product ID</label><input class="fi" id="prod-shopify-id" placeholder="8123456789"></div>
-    <div class="fg"><label>Cena prodaje (RSD) — bez poštarine</label><input class="fi" id="prod-price" type="number" placeholder="2500"></div>
+    <div class="alert info" style="margin-bottom:14px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Cena se automatski uzima sa Shopify-a pri sync-u</span></div><input type="hidden" id="prod-price">
     <div class="modal-section">Potrošnja po lampi</div>
     <div class="fi-row">
       <div class="fg"><label>Filament kutija (g)</label><input class="fi" id="prod-fg-kut" type="number" placeholder="150"></div>
@@ -896,11 +898,7 @@ function renderDash(){
   // Production plan
   renderProdPlan();
 
-  // Pending orders
-  const pendingOrds=pending.slice(0,5);
-  document.getElementById('dash-orders').innerHTML=pendingOrds.length===0
-    ?`<div class="alert ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg><span>Nema narudžbina na čekanju!</span></div>`
-    :pendingOrds.map(o=>renderOrderCard(o,true)).join('');
+  // Pending orders removed from dashboard
 
   // Lager quick
   let lagHTML='<div class="card" style="padding:12px 16px">';
@@ -954,7 +952,7 @@ function renderOrderCard(order,compact){
     <div class="ord-head"><div><div class="ord-name">${order.shopify_id||'#—'} ${order.customer?'· '+order.customer:''}</div><div class="ord-meta">${fmtDate(order.created_at)} · ${fmt(prihod)} RSD</div></div><span class="badge ${sc}">${sl}</span></div>
     <div class="ord-body"><div>${itemsHTML}</div>${readHTML}</div>
     <div class="ord-status-bar">
-      <span style="font-size:13px;color:var(--text2)">Profit: <strong>${fmt(profit)} RSD</strong></span>
+      <span style="font-size:13px;color:var(--text2)">Cena: <strong>${fmt(prihod)} RSD</strong> · Profit: <strong style='color:var(--green)'>${fmt(profit)} RSD</strong></span>
       <div style="display:flex;gap:8px">
         ${order.status!=='ready'&&r.canFulfill?`<button class="btn xs primary" onclick="markReady('${order.id}')">Spreman</button>`:''}
         ${order.status==='ready'?`<button class="btn xs primary" onclick="markFulfilled('${order.id}')">Fulfilled ✓</button>`:''}
@@ -1222,16 +1220,20 @@ async function saveComp(){
   const qty=parseFloat(document.getElementById('comp-qty').value)||0;
   if(qty<=0){toast('Unesi količinu');return;}
   const prodId=document.getElementById('comp-prod-select').value||null;
+  const noDeduct=document.getElementById('comp-no-deduct')?.checked||false;
   const prodNeeded=['lica','kutije_stamp','sklopljene','gotove'];
   if(prodNeeded.includes(type)&&!prodId){toast('Izaberi proizvod');return;}
 
-  if(type==='sklopljene'&&prodId){const p=getProdById(prodId);if(p){await deductLager('kutije_stamp',qty,prodId);await deductLager('usb',(p.usb||1)*qty);await deductLager('led',(p.led||1)*qty);}}
-  else if(type==='gotove'&&prodId){await deductLager('sklopljene',qty,prodId);await deductLager('lica',qty,prodId);}
+  if(!noDeduct){
+    if(type==='sklopljene'&&prodId){const p=getProdById(prodId);if(p){await deductLager('kutije_stamp',qty,prodId);await deductLager('usb',(p.usb||1)*qty);await deductLager('led',(p.led||1)*qty);}}
+    else if(type==='gotove'&&prodId){await deductLager('sklopljene',qty,prodId);await deductLager('lica',qty,prodId);}
+  }
   await addLager(type,qty,prodId||undefined);
 
   closeModal('m-add-comp');
   document.getElementById('comp-qty').value='';
-  renderLag();renderDash();toast('✓ Lager ažuriran');
+  document.getElementById('comp-no-deduct').checked=false;
+  renderLag();renderDash();toast(noDeduct?'✓ Dodano bez oduzimanja':'✓ Lager ažuriran');
 }
 
 // ===================== FINANSIJE =====================
