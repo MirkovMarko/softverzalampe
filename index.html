@@ -208,6 +208,8 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
   </div>
   <div id="dash-alerts"></div>
   <div class="stats2" id="dash-stats"></div>
+  <div class="sec-lbl">Produkcijski plan</div>
+  <div id="dash-prod-plan"></div>
   <div class="sec-lbl">Čeka obradu</div>
   <div id="dash-orders"></div>
   <div class="sec-lbl">Lager — brzo</div>
@@ -760,6 +762,110 @@ function toast(msg,duration=2600){
   setTimeout(()=>t.classList.remove('show'),duration);
 }
 
+// ===================== PRODUKCIJSKI PLAN =====================
+function renderProdPlan(){
+  const el = document.getElementById('dash-prod-plan');
+  if(!el) return;
+
+  // Skupi sve pending narudzbine po proizvodu
+  const pending = DB.orders.filter(o=>o.status!=='fulfilled');
+  const byProd = {};
+  pending.forEach(o=>{
+    (o.items||[]).forEach(it=>{
+      const pid = it.productId||it.product_id;
+      if(!byProd[pid]) byProd[pid] = {needed:0, sent:0};
+      byProd[pid].needed += (it.qty||1);
+    });
+  });
+
+  const ready = DB.orders.filter(o=>o.status==='ready');
+  ready.forEach(o=>{
+    (o.items||[]).forEach(it=>{
+      const pid = it.productId||it.product_id;
+      if(byProd[pid]) byProd[pid].sent += (it.qty||1);
+    });
+  });
+
+  if(Object.keys(byProd).length===0){
+    el.innerHTML=`<div class="alert ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg><span>Nema pending narudžbina — sve je odrađeno! 🎉</span></div>`;
+    return;
+  }
+
+  let html = '';
+  Object.entries(byProd).forEach(([pid, d])=>{
+    const p = getProdById(pid);
+    if(!p) return;
+    const needed = d.needed;
+    const gotove = getLagerQty('gotove', pid);
+    const sklopljene = getLagerQty('sklopljene', pid);
+    const lica = getLagerQty('lica', pid);
+    const kutije = getLagerQty('kutije_stamp', pid);
+    const usb = getLagerQty('usb');
+    const led = getLagerQty('led');
+    const ledPerLamp = p.led||1;
+    const usbPerLamp = p.usb||1;
+
+    // Koliko može odmah da se pošalje
+    const canSendNow = Math.min(gotove, needed);
+    // Koliko može da se sklopi iz gotovih delova
+    const canAssemble = Math.min(sklopljene, lica);
+    // Koliko još fali
+    const stillNeeded = Math.max(0, needed - gotove);
+    // Koliko kutija treba da se odštampa
+    const printKutije = Math.max(0, stillNeeded - sklopljene);
+    const printLica = Math.max(0, stillNeeded - lica);
+    // Koliko USB/LED fali
+    const needUsb = Math.max(0, stillNeeded * usbPerLamp - usb);
+    const needLed = Math.max(0, stillNeeded * ledPerLamp - led);
+
+    const statusColor = gotove>=needed ? 'var(--green)' : sklopljene>0||lica>0 ? 'var(--warn)' : 'var(--red)';
+    const statusIcon = gotove>=needed ? '✅' : '🔧';
+
+    html += `<div class="card" style="margin-bottom:10px;border-left:3px solid ${statusColor}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-weight:700;font-size:15px">${p.name}</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="badge blue">${needed} naručeno</span>
+          ${gotove>=needed?`<span class="badge green">✓ Spreman</span>`:''}
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+        <div style="text-align:center;background:var(--surface2);border-radius:var(--rs);padding:8px">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:3px">Gotove</div>
+          <div style="font-size:20px;font-weight:700;color:${gotove>=needed?'var(--green)':'var(--red)'}">${gotove}</div>
+          <div style="font-size:10px;color:var(--text3)">/${needed}</div>
+        </div>
+        <div style="text-align:center;background:var(--surface2);border-radius:var(--rs);padding:8px">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:3px">Sklopljene</div>
+          <div style="font-size:20px;font-weight:700;color:${sklopljene>0?'var(--warn)':'var(--text3)'}">${sklopljene}</div>
+        </div>
+        <div style="text-align:center;background:var(--surface2);border-radius:var(--rs);padding:8px">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:3px">Lica</div>
+          <div style="font-size:20px;font-weight:700;color:${lica>=stillNeeded?'var(--green)':'var(--red)'}">${lica}</div>
+        </div>
+        <div style="text-align:center;background:var(--surface2);border-radius:var(--rs);padding:8px">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:3px">Kutije</div>
+          <div style="font-size:20px;font-weight:700;color:${kutije>=stillNeeded?'var(--green)':'var(--red)'}">${kutije}</div>
+        </div>
+      </div>`;
+
+    // Akcije koje treba uraditi
+    const actions = [];
+    if(canSendNow > 0 && gotove >= needed) actions.push(`<div class="alert ok" style="margin:4px 0;padding:8px 12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg><span>Spremi za slanje — imaš dovoljno gotovih lampi!</span></div>`);
+    if(canAssemble > 0 && gotove < needed) actions.push(`<div class="alert warn" style="margin:4px 0;padding:8px 12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Zalepi lice na ${canAssemble} sklopljenih kutija → gotove lampe</span></div>`);
+    if(printKutije > 0) actions.push(`<div class="alert info" style="margin:4px 0;padding:8px 12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14"><rect x="2" y="3" width="20" height="14" rx="2"/></svg><span>Odštampaj još <strong>${printKutije} kutija</strong></span></div>`);
+    if(printLica > 0) actions.push(`<div class="alert info" style="margin:4px 0;padding:8px 12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14"><rect x="2" y="3" width="20" height="14" rx="2"/></svg><span>Odštampaj još <strong>${printLica} lica</strong></span></div>`);
+    if(needUsb > 0) actions.push(`<div class="alert danger" style="margin:4px 0;padding:8px 12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Nedostaje <strong>${needUsb} USB kablova</strong>!</span></div>`);
+    if(needLed > 0) actions.push(`<div class="alert danger" style="margin:4px 0;padding:8px 12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Nedostaje <strong>${needLed}m LED trake</strong>!</span></div>`);
+
+    if(actions.length > 0) html += actions.join('');
+    html += '</div>';
+  });
+
+  el.innerHTML = html;
+}
+
 // ===================== DASHBOARD =====================
 function renderDash(){
   const now=new Date();
@@ -786,6 +892,9 @@ function renderDash(){
     <div class="stat-card"><div class="stat-lbl">Prihod mesec</div><div class="stat-num">${fmt(prihod)}<small> RSD</small></div></div>
     <div class="stat-card"><div class="stat-lbl">Profit mesec</div><div class="stat-num green">${fmt(profit)}<small> RSD</small></div></div>
     <div class="stat-card"><div class="stat-lbl">Krajnji profit</div><div class="stat-num ${finalProfit>=0?'green':'red'}">${fmt(finalProfit)}<small> RSD</small></div><div class="stat-sub">−${fmt(totalRekl)} reklame</div></div>`;
+
+  // Production plan
+  renderProdPlan();
 
   // Pending orders
   const pendingOrds=pending.slice(0,5);
