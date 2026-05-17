@@ -574,19 +574,21 @@ let ordFilter='pending', lagTabCurrent='comp', sklopAction=null;
 // ===================== LOAD FROM SUPABASE =====================
 async function loadAll(){
   setLoading('Učitavam narudžbine...');
-  const [orders, products, costs, reklame, lagerRows, settingsRows, limitsRows, returnsData, incomingData] = await Promise.all([
-    sb.get('orders','order=created_at.desc'),
+  const [orders, products, costs, reklame, lagerRows, settingsRows, limitsRows, fulfilledOrders, returnsData, incomingData] = await Promise.all([
+    sb.get('orders','order=created_at.desc&status=neq.fulfilled'),
     sb.get('products','order=name.asc'),
     sb.get('costs','order=date.desc'),
     sb.get('reklame','order=date.desc'),
     sb.get('lager'),
     sb.get('settings'),
     sb.get('comp_limits'),
+    sb.get('orders','order=fulfilled_at.desc&status=eq.fulfilled&limit=500'),
     sb.get('returns','order=date.desc'),
     sb.get('incoming','order=ordered_at.desc'),
   ]);
 
-  DB.orders = (orders||[]).map(o=>({...o, items: typeof o.items === 'string' ? JSON.parse(o.items||'[]') : (o.items||[])}));
+  const allOrders = [...(orders||[]), ...(fulfilledOrders||[])];
+  DB.orders = allOrders.map(o=>({...o, items: typeof o.items === 'string' ? JSON.parse(o.items||'[]') : (o.items||[])}));
   DB.returns = returnsData||[];
   DB.incoming = incomingData||[];
   DB.products = products||[];
@@ -814,7 +816,8 @@ function renderOrds(){
   const all=DB.orders.filter(o=>o.status!=='fulfilled');
   const pending=all.filter(o=>o.status==='pending'||o.status==='processing');
   const ready=all.filter(o=>o.status==='ready');
-  let show=ordFilter==='pending'?pending:ordFilter==='ready'?ready:DB.orders;
+  const unfulfilled=DB.orders.filter(o=>o.status!=='fulfilled');
+  let show=ordFilter==='pending'?pending:ordFilter==='ready'?ready:unfulfilled;
   document.getElementById('ord-sub').textContent=`${pending.length} na čekanju · ${ready.length} spremo`;
   document.getElementById('ord-list').innerHTML=show.length===0
     ?`<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg><p>Nema narudžbina</p></div>`
@@ -1037,12 +1040,12 @@ function openSklop(action,prodId){
     const canDo=kut>0&&usb>=usbN&&led>=ledN;
     const maxQ=Math.min(kut,Math.floor(usb/usbN),Math.floor(led/ledN))||0;
     document.getElementById('m-sklop-body').innerHTML=`<div class="alert ${canDo?'ok':'warn'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Skida: <strong>1 kutija + ${usbN} USB + ${ledN}m LED</strong></span></div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">${miniStat('Kutije',kut,'kom')}${miniStat('USB',usb,'kom')}${miniStat('LED',led,'m')}</div><div class="fg" style="margin-top:14px"><label>Količina</label><input class="fi" id="sklop-qty" type="number" value="1" min="1"></div><div class="switch-row" style="margin-top:8px"><div><div class="switch-label" style="font-size:13px">Ne skidaj lager (ručni unos)</div></div><input type="checkbox" id="sklop-no-deduct" style="width:20px;height:20px;cursor:pointer"></div>`;
-    document.getElementById('m-sklop-confirm').disabled=!canDo;
+    document.getElementById('m-sklop-confirm').disabled=false;
   } else {
     const canDo=sklop>0&&lica>0;
     const maxQ=Math.min(sklop,lica)||0;
     document.getElementById('m-sklop-body').innerHTML=`<div class="alert ${canDo?'ok':'warn'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Skida: <strong>1 sklopljena kutija + 1 lice</strong> → gotova lampa</span></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">${miniStat('Sklopljene',sklop,'kom')}${miniStat('Lica',lica,'kom')}</div><div class="fg" style="margin-top:14px"><label>Količina</label><input class="fi" id="sklop-qty" type="number" value="1" min="1"></div><div class="switch-row" style="margin-top:8px"><div><div class="switch-label" style="font-size:13px">Ne skidaj lager (ručni unos)</div></div><input type="checkbox" id="sklop-no-deduct" style="width:20px;height:20px;cursor:pointer"></div>`;
-    document.getElementById('m-sklop-confirm').disabled=!canDo;
+    document.getElementById('m-sklop-confirm').disabled=false;
   }
   openModal('m-sklop');
 }
@@ -1127,7 +1130,11 @@ function renderFin(){
   const mo=currentFinMonth,yr=currentFinYear;
   const months=['Januar','Februar','Mart','April','Maj','Jun','Jul','Avgust','Septembar','Oktobar','Novembar','Decembar'];
   document.getElementById('fin-month-lbl').textContent=`${months[mo]} ${yr}`;
-  const ords=DB.orders.filter(o=>{const d=new Date(o.fulfilled_at||o.created_at);return o.status==='fulfilled'&&d.getMonth()===mo&&d.getFullYear()===yr;});
+  const ords=DB.orders.filter(o=>{
+    if(o.status!=='fulfilled') return false;
+    const d=new Date(o.fulfilled_at||o.created_at);
+    return d.getMonth()===mo&&d.getFullYear()===yr;
+  });
   let totalPrihod=0,totalProfit=0;
   const byProd={};
   ords.forEach(o=>{const r=calcProfitPerOrder(o);totalPrihod+=r.prihod;totalProfit+=r.profit;(o.items||[]).forEach(it=>{const pid=it.productId||it.product_id;if(!byProd[pid])byProd[pid]={qty:0};byProd[pid].qty+=(it.qty||1);});});
@@ -1277,6 +1284,8 @@ async function doSync(){
     const monthStart=new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString();
     try{
       const fulfilledResp=await fetch('https://softverzalampe.vercel.app/api/shopify?'+new URLSearchParams({path:'orders.json',status:'any',created_at_min:monthStart,limit:'250'}).toString(),{headers:{'X-Shopify-URL':url,'X-Shopify-Token':token}});
+      // Also get previous 30 days in case of late fulfillment
+
       if(fulfilledResp.ok){
         const fd=await fulfilledResp.json();
         for(const so of (fd.orders||[])){
@@ -1304,11 +1313,18 @@ async function doSync(){
         await sb.upsert('orders',[{...o,items:JSON.stringify(items)}]);
         DB.orders.unshift(o);added++;
       } else if(so.fulfillment_status==='fulfilled'&&existing.status!=='fulfilled'){
-        for(const it of (existing.items||[])){await deductLager('gotove',it.qty||1,it.productId);}
+        // Fulfilled na Shopify - skini sa lagera i obrisi iz baze
+        for(const it of (existing.items||[])){await deductLager('gotove',it.qty||1,it.productId||it.product_id);}
         await deductLager('karton',1);
-        existing.status='fulfilled';existing.fulfilled_at=so.fulfilled_at;
-        await sb.update('orders','id=eq.'+existing.id,{status:'fulfilled',fulfilled_at:so.fulfilled_at});
+        await sb.delete('orders','id=eq.'+existing.id);
+        DB.orders=DB.orders.filter(o=>o.id!==existing.id);
+        // Sacuvaj kao fulfilled za finansije
+        const fo={...existing,status:'fulfilled',fulfilled_at:so.fulfilled_at||new Date().toISOString()};
+        await sb.upsert('orders',[{...fo,items:JSON.stringify(fo.items||[])}]);
+        DB.orders.push(fo);
         updated++;
+      } else if(so.fulfillment_status==='fulfilled'&&existing.status==='fulfilled'){
+        // Vec fulfilled, samo proveri da li je u bazi
       }
     }
     renderDash();renderOrds();toast(`✓ Sync: ${added} novih, ${updated} ažurirano`);
@@ -1550,7 +1566,11 @@ async function deleteIncoming(id){
 
 function exportCSV(){
   const mo=currentFinMonth,yr=currentFinYear;
-  const ords=DB.orders.filter(o=>{const d=new Date(o.fulfilled_at||o.created_at);return o.status==='fulfilled'&&d.getMonth()===mo&&d.getFullYear()===yr;});
+  const ords=DB.orders.filter(o=>{
+    if(o.status!=='fulfilled') return false;
+    const d=new Date(o.fulfilled_at||o.created_at);
+    return d.getMonth()===mo&&d.getFullYear()===yr;
+  });
   let csv='Datum,Narudzbina,Kupac,Proizvod,Kolicina,Prihod RSD,Postarina RSD,Profit RSD\n';
   ords.forEach(o=>{const r=calcProfitPerOrder(o);(o.items||[]).forEach(it=>{const p=getProdById(it.productId||it.product_id);csv+=`${fmtDate(o.fulfilled_at||o.created_at)},${o.shopify_id||''},${o.customer||''},${p?p.name:'?'},${it.qty},${r.prihod},${r.postarina},${r.profit}\n`;});});
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
