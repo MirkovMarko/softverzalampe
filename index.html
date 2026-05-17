@@ -1113,7 +1113,6 @@ async function saveComp(){
   const qty=parseFloat(document.getElementById('comp-qty').value)||0;
   if(qty<=0){toast('Unesi količinu');return;}
   const prodId=document.getElementById('comp-prod-select').value||null;
-  const price=parseFloat(document.getElementById('comp-price').value)||0;
   const prodNeeded=['lica','kutije_stamp','sklopljene','gotove'];
   if(prodNeeded.includes(type)&&!prodId){toast('Izaberi proizvod');return;}
 
@@ -1121,14 +1120,8 @@ async function saveComp(){
   else if(type==='gotove'&&prodId){await deductLager('sklopljene',qty,prodId);await deductLager('lica',qty,prodId);}
   await addLager(type,qty,prodId||undefined);
 
-  if(price>0){
-    const names={usb:'USB kablovi',led:'LED traka',karton:'Kutije za pakovanje',lica:'Lica',kutije_stamp:'Kutije štampane'};
-    const cost={id:uid(),cat:'material',descr:names[type]||type,amount:price,date:today()};
-    await sb.upsert('costs',[cost]);
-    DB.costs.unshift(cost);
-  }
   closeModal('m-add-comp');
-  document.getElementById('comp-qty').value='';document.getElementById('comp-price').value='';
+  document.getElementById('comp-qty').value='';
   renderLag();renderDash();toast('✓ Lager ažuriran');
 }
 
@@ -1260,13 +1253,18 @@ async function syncProducts(url, token){
   const shopifyProds = data.products||[];
   let added = 0;
   for(const sp of shopifyProds){
+    const shopifyPrice = parseFloat(sp.variants?.[0]?.price||0) - (DB.settings.postarina||390);
     const existing = DB.products.find(p=>p.shopify_id===String(sp.id));
+    if(existing && Math.abs((existing.price||0)-shopifyPrice)>1){
+      existing.price = shopifyPrice;
+      await sb.upsert('products',[existing]);
+    }
     if(!existing){
       const prod = {
         id: uid(),
         name: sp.title,
         shopify_id: String(sp.id),
-        price: parseFloat(sp.variants?.[0]?.price||0),
+        price: parseFloat(sp.variants?.[0]?.price||0) - (DB.settings.postarina||390), // Cena bez poštarine
         filament_kut: 0,
         filament_lice: 0,
         led: 1,
@@ -1456,11 +1454,36 @@ async function saveProd(){
   const name=document.getElementById('prod-name').value.trim();
   if(!name){toast('Unesi naziv');return;}
   const editId=document.getElementById('prod-edit-id').value;
-  const prod={id:editId||uid(),name,shopify_id:document.getElementById('prod-shopify-id').value.trim(),price:parseFloat(document.getElementById('prod-price').value)||0,filament_kut:parseFloat(document.getElementById('prod-fg-kut').value)||0,filament_lice:parseFloat(document.getElementById('prod-fg-lice').value)||0,led:parseFloat(document.getElementById('prod-led').value)||1,usb:parseFloat(document.getElementById('prod-usb').value)||1,usb_cost:parseFloat(document.getElementById('prod-usb-cost').value)||0,led_cost:parseFloat(document.getElementById('prod-led-cost').value)||0,karton_cost:parseFloat(document.getElementById('prod-karton-cost').value)||0,other_cost:parseFloat(document.getElementById('prod-other').value)||0};
+  const shopifyId=document.getElementById('prod-shopify-id').value.trim();
+  let price=parseFloat(document.getElementById('prod-price').value)||0;
+
+  // Ako nema cenu a ima shopify_id, pokusaj da povuce sa Shopify
+  if(price===0 && shopifyId && DB.settings.shopUrl && DB.settings.shopToken){
+    try{
+      const r=await fetch('https://softverzalampe.vercel.app/api/shopify?'+new URLSearchParams({path:'products/'+shopifyId+'.json'}).toString(),{headers:{'X-Shopify-URL':DB.settings.shopUrl,'X-Shopify-Token':DB.settings.shopToken}});
+      if(r.ok){const d=await r.json();price=parseFloat(d.product?.variants?.[0]?.price||0);}
+    }catch(e){}
+  }
+
+  const prod={
+    id:editId||uid(),name,shopify_id:shopifyId,price,
+    filament_kut:parseFloat(document.getElementById('prod-fg-kut').value)||0,
+    filament_lice:parseFloat(document.getElementById('prod-fg-lice').value)||0,
+    led:parseFloat(document.getElementById('prod-led').value)||1,
+    usb:parseFloat(document.getElementById('prod-usb').value)||1,
+    usb_cost:parseFloat(document.getElementById('prod-usb-cost').value)||0,
+    led_cost:parseFloat(document.getElementById('prod-led-cost').value)||0,
+    karton_cost:parseFloat(document.getElementById('prod-karton-cost').value)||0,
+    other_cost:parseFloat(document.getElementById('prod-other').value)||0
+  };
   await sb.upsert('products',[prod]);
   if(editId){const idx=DB.products.findIndex(p=>p.id===editId);if(idx>=0)DB.products[idx]=prod;}
-  else{DB.products.push(prod);await sb.upsert('lager',[{key:'lica::'+prod.id,value:0},{key:'kutije_stamp::'+prod.id,value:0},{key:'sklopljene::'+prod.id,value:0},{key:'gotove::'+prod.id,value:0}]);DB.lager.lica[prod.id]=0;DB.lager.kutije_stamp[prod.id]=0;DB.lager.sklopljene[prod.id]=0;DB.lager.gotove[prod.id]=0;}
-  closeModal('m-add-prod');renderSet();renderLag();toast('✓ Proizvod sačuvan');
+  else{
+    DB.products.push(prod);
+    await sb.upsert('lager',[{key:'lica::'+prod.id,value:0},{key:'kutije_stamp::'+prod.id,value:0},{key:'sklopljene::'+prod.id,value:0},{key:'gotove::'+prod.id,value:0}]);
+    DB.lager.lica[prod.id]=0;DB.lager.kutije_stamp[prod.id]=0;DB.lager.sklopljene[prod.id]=0;DB.lager.gotove[prod.id]=0;
+  }
+  closeModal('m-add-prod');renderSet();renderLag();toast('✓ Proizvod sačuvan — cena: '+fmt(price)+' RSD');
 }
 
 // ===================== VRAĆENE LAMPE =====================
@@ -1567,34 +1590,26 @@ async function markIncomingArrived(id){
   // Dodaj na lager
   await addLager(inc.type, inc.qty, inc.product_id||undefined);
 
-  // Ažuriraj cenu komponente u proizvodu ako je USB ili LED
+  // Uvek azuriraj cenu po komadu u svim proizvodima kad stigne nova tura
   if(inc.unit_price>0){
-    if(inc.type==='usb'){
-      DB.products.forEach(async p=>{
-        if(!p.usb_cost||p.usb_cost===0){
-          p.usb_cost = inc.unit_price;
+    const costField = inc.type==='usb'?'usb_cost':inc.type==='led'?'led_cost':inc.type==='karton'?'karton_cost':null;
+    if(costField){
+      for(const p of DB.products){
+        const oldCost = p[costField]||0;
+        if(oldCost !== inc.unit_price){
+          p[costField] = inc.unit_price;
           await sb.upsert('products',[p]);
         }
-      });
-    } else if(inc.type==='led'){
-      DB.products.forEach(async p=>{
-        if(!p.led_cost||p.led_cost===0){
-          p.led_cost = inc.unit_price;
-          await sb.upsert('products',[p]);
-        }
-      });
-    } else if(inc.type==='karton'){
-      DB.products.forEach(async p=>{
-        if(!p.karton_cost||p.karton_cost===0){
-          p.karton_cost = inc.unit_price;
-          await sb.upsert('products',[p]);
-        }
-      });
+      }
+      toast(`✓ Stiglo! Cena ${inc.type} ažurirana na ${fmt(inc.unit_price)} RSD/kom za sve lampe`);
+    } else {
+      toast(`✓ Stiglo! ${inc.qty} ${inc.type} dodano na lager`);
     }
+  } else {
+    toast(`✓ Stiglo! ${inc.qty} ${inc.type} dodano na lager`);
   }
 
-  renderLag();renderDash();
-  toast(`✓ Stiglo! ${inc.qty} ${inc.type} dodano na lager`);
+  renderLag();renderDash();renderSet();
 }
 
 async function deleteIncoming(id){
