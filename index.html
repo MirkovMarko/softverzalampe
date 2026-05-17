@@ -1297,58 +1297,76 @@ async function doSync(){
   btn.innerHTML='<div class="spinner"></div>';btn.disabled=true;
   try{
     const url=DB.settings.shopUrl,token=DB.settings.shopToken;
-    if(!url||!token){toast('⚠ Unesi Shopify API u Podešavanjima');return;}
-    // Prvo povuci proizvode iz Shopify-a
-    const addedProds = await syncProducts(url, token);
-    if(addedProds>0) toast('✓ Dodano '+addedProds+' novih proizvoda iz Shopify-a');
-    // Povuci fulfilled narudzbine za ovaj mesec (za prihod)
-    const monthStart=new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString();
-    try{
-      const fulfilledResp=await fetch('https://softverzalampe.vercel.app/api/shopify?'+new URLSearchParams({path:'orders.json',status:'any',created_at_min:monthStart,limit:'250'}).toString(),{headers:{'X-Shopify-URL':url,'X-Shopify-Token':token}});
-      // Also get previous 30 days in case of late fulfillment
+    if(!url||!token){toast('⚠ Unesi Shopify API u Podešavanjima');btn.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="15" height="15"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg> Shopify';btn.disabled=false;return;}
 
-      if(fulfilledResp.ok){
-        const fd=await fulfilledResp.json();
-        for(const so of (fd.orders||[])){
-          const ex=DB.orders.find(o=>o.shopify_id==='#'+so.order_number);
-          if(!ex){
-            const fitems=(so.line_items||[]).map(li=>{const p=DB.products.find(x=>x.shopify_id===String(li.product_id));return{productId:p?p.id:String(li.product_id),qty:li.quantity,name:li.title};});
-            const fo={id:uid(),shopify_id:'#'+so.order_number,customer:so.shipping_address?.first_name||'',items:fitems,total:parseFloat(so.total_price)||0,status:'fulfilled',created_at:so.created_at,fulfilled_at:so.updated_at};
-            await sb.upsert('orders',[{...fo,items:JSON.stringify(fitems)}]);
-            DB.orders.unshift(fo);
-          }
+    // 1. Povuci proizvode
+    const addedProds = await syncProducts(url, token);
+    if(addedProds>0) toast('✓ Dodano '+addedProds+' novih proizvoda');
+
+    // 2. Povuci SVE narudzbine za ovaj mesec (any status)
+    const monthStart=new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString();
+    const allResp=await fetch('https://softverzalampe.vercel.app/api/shopify?'+new URLSearchParams({path:'orders.json',status:'any',created_at_min:monthStart,limit:'250'}).toString(),{headers:{'X-Shopify-URL':url,'X-Shopify-Token':token}});
+    if(!allResp.ok) throw new Error('Shopify API: '+allResp.status);
+    const allData=await allResp.json();
+    let added=0,updated=0,cancelled=0;
+
+    for(const so of (allData.orders||[])){
+      const shopifyId='#'+so.order_number;
+      const isCancelled=so.cancelled_at||so.cancel_reason||so.financial_status==='voided';
+      const existing=DB.orders.find(o=>o.shopify_id===shopifyId);
+
+      // Ako je cancelled - obrisi iz baze i preskoči
+      if(isCancelled){
+        if(existing){
+          await sb.delete('orders','id=eq.'+existing.id);
+          DB.orders=DB.orders.filter(o=>o.id!==existing.id);
+          cancelled++;
         }
+        continue; // Ne dodavaj cancelled
       }
-    }catch(e){}
-    const since=new Date(Date.now()-60*86400000).toISOString();
-    const resp=await fetch(`https://softverzalampe.vercel.app/api/shopify?`+new URLSearchParams({path:'orders.json',status:'open',created_at_min:since,limit:'50'}).toString(),{headers:{'X-Shopify-URL':url,'X-Shopify-Token':token}});
-    if(!resp.ok)throw new Error('Shopify API: '+resp.status);
-    const data=await resp.json();
-    let added=0,updated=0;
-    for(const so of (data.orders||[])){
-      const existing=DB.orders.find(o=>o.shopify_id==='#'+so.order_number);
-      const items=(so.line_items||[]).map(li=>{const p=DB.products.find(x=>x.shopify_id===String(li.product_id));return{productId:p?p.id:String(li.product_id),qty:li.quantity,name:li.title,shopify_product_id:String(li.product_id)};});
+
+      const items=(so.line_items||[]).map(li=>{
+        const p=DB.products.find(x=>x.shopify_id===String(li.product_id));
+        return{productId:p?p.id:String(li.product_id),qty:li.quantity,name:li.title};
+      });
       const total=parseFloat(so.total_price)||0;
+      const isFulfilled=so.fulfillment_status==='fulfilled';
+      const status=isFulfilled?'fulfilled':'pending';
+
       if(!existing){
-        const o={id:uid(),shopify_id:'#'+so.order_number,customer:so.shipping_address?.first_name||'',items,total,status:so.fulfillment_status==='fulfilled'?'fulfilled':'pending',created_at:so.created_at,fulfilled_at:so.fulfilled_at};
+        const o={id:uid(),shopify_id:shopifyId,customer:so.shipping_address?.first_name||so.billing_address?.first_name||'',items,total,status,created_at:so.created_at,fulfilled_at:so.fulfilled_at||null};
         await sb.upsert('orders',[{...o,items:JSON.stringify(items)}]);
-        DB.orders.unshift(o);added++;
-      } else if(so.fulfillment_status==='fulfilled'&&existing.status!=='fulfilled'){
-        // Fulfilled na Shopify - skini sa lagera i obrisi iz baze
-        for(const it of (existing.items||[])){await deductLager('gotove',it.qty||1,it.productId||it.product_id);}
-        await deductLager('karton',1);
-        await sb.delete('orders','id=eq.'+existing.id);
-        DB.orders=DB.orders.filter(o=>o.id!==existing.id);
-        // Sacuvaj kao fulfilled za finansije
-        const fo={...existing,status:'fulfilled',fulfilled_at:so.fulfilled_at||new Date().toISOString()};
-        await sb.upsert('orders',[{...fo,items:JSON.stringify(fo.items||[])}]);
-        DB.orders.push(fo);
+        DB.orders.unshift(o);
+        added++;
+      } else if(isFulfilled&&existing.status!=='fulfilled'){
+        existing.status='fulfilled';
+        existing.fulfilled_at=so.fulfilled_at||new Date().toISOString();
+        await sb.update('orders','id=eq.'+existing.id,{status:'fulfilled',fulfilled_at:existing.fulfilled_at});
         updated++;
-      } else if(so.fulfillment_status==='fulfilled'&&existing.status==='fulfilled'){
-        // Vec fulfilled, samo proveri da li je u bazi
       }
     }
-    renderDash();renderOrds();toast(`✓ Sync: ${added} novih, ${updated} ažurirano`);
+
+    // 3. Takodje povuci open narudzbine starije od mesec dana (ako ima)
+    const since60=new Date(Date.now()-60*86400000).toISOString();
+    const openResp=await fetch('https://softverzalampe.vercel.app/api/shopify?'+new URLSearchParams({path:'orders.json',status:'open',created_at_min:since60,limit:'50'}).toString(),{headers:{'X-Shopify-URL':url,'X-Shopify-Token':token}});
+    if(openResp.ok){
+      const openData=await openResp.json();
+      for(const so of (openData.orders||[])){
+        const shopifyId='#'+so.order_number;
+        const isCancelled=so.cancelled_at||so.cancel_reason;
+        if(isCancelled) continue;
+        const existing=DB.orders.find(o=>o.shopify_id===shopifyId);
+        if(!existing){
+          const items=(so.line_items||[]).map(li=>{const p=DB.products.find(x=>x.shopify_id===String(li.product_id));return{productId:p?p.id:String(li.product_id),qty:li.quantity,name:li.title};});
+          const o={id:uid(),shopify_id:shopifyId,customer:so.shipping_address?.first_name||'',items,total:parseFloat(so.total_price)||0,status:'pending',created_at:so.created_at,fulfilled_at:null};
+          await sb.upsert('orders',[{...o,items:JSON.stringify(items)}]);
+          DB.orders.unshift(o);added++;
+        }
+      }
+    }
+
+    renderDash();renderOrds();
+    toast(`✓ Sync: ${added} novih, ${updated} ažurirano${cancelled>0?', '+cancelled+' cancelled obrisano':''}`);
   }catch(e){toast('❌ '+e.message);}
   btn.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="15" height="15"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg> Shopify`;btn.disabled=false;
 }
