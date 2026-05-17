@@ -1,11 +1,7 @@
 {
   "functions": {
     "api/shopify.js": {
-      "runtime": "nodejs20.x"
+      "runtime": "edge"
     }
-  },
-  "routes": [
-    { "src": "/api/(.*)", "dest": "/api/$1" },
-    { "src": "/(.*)", "dest": "/index.html" }
-  ]
+  }
 }

@@ -1,35 +1,64 @@
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Shopify-Token, X-Shopify-URL, X-Shopify-Access-Token');
+export const config = { runtime: 'edge' };
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
-
-  // Čitaj iz query params ili headera
-  const shopUrl = req.headers['x-shopify-url'] || req.query.shop_url;
-  const token = req.headers['x-shopify-token'] || req.headers['x-shopify-access-token'] || req.query.token;
-  const path = req.query.path || 'orders.json';
-
-  if (!shopUrl || !token) {
-    return res.status(400).json({ error: 'Nedostaje shopUrl ili token' });
+export default async function handler(req) {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, X-Shopify-URL, X-Shopify-Token, Authorization',
+      }
+    });
   }
 
-  try {
-    const url = `https://${shopUrl}/admin/api/2024-01/${path}`;
-    const params = new URLSearchParams(req.query);
-    params.delete('path');
-    const fullUrl = params.toString() ? url + '?' + params.toString() : url;
+  const url = new URL(req.url);
+  const shopUrl = req.headers.get('x-shopify-url');
+  const token = req.headers.get('x-shopify-token');
+  const path = url.searchParams.get('path') || 'orders.json';
 
-    const response = await fetch(fullUrl, {
+  if (!shopUrl || !token) {
+    return new Response(JSON.stringify({ error: 'Nedostaje shopUrl ili token' }), {
+      status: 400,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      }
+    });
+  }
+
+  // Build Shopify URL
+  const params = new URLSearchParams(url.searchParams);
+  params.delete('path');
+  const shopifyUrl = `https://${shopUrl}/admin/api/2024-01/${path}?${params.toString()}`;
+
+  try {
+    const response = await fetch(shopifyUrl, {
       headers: {
         'X-Shopify-Access-Token': token,
         'Content-Type': 'application/json',
       },
     });
 
-    const data = await response.json();
-    return res.status(response.status).json(data);
+    const data = await response.text();
+
+    return new Response(data, {
+      status: response.status,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, X-Shopify-URL, X-Shopify-Token',
+      }
+    });
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      }
+    });
   }
 }
