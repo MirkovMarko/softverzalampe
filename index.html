@@ -1312,9 +1312,48 @@ async function markReady(id){
   renderOrds();renderDash();toast('✓ Spreman za slanje');
 }
 
+async function fulfillOnShopify(shopifyId){
+  // shopifyId je npr '#1234' - trebamo samo broj
+  const orderNum = shopifyId.replace('#','');
+  const url = DB.settings.shopUrl;
+  const token = DB.settings.shopToken;
+  if(!url||!token) return false;
+
+  try{
+    // 1. Uzmi fulfillment_orders za tu narudzbinu
+    const r1 = await fetch(`https://softverzalampe.vercel.app/api/shopify?path=orders/${orderNum}/fulfillment_orders.json`,{
+      headers:{'X-Shopify-URL':url,'X-Shopify-Token':token}
+    });
+    if(!r1.ok) return false;
+    const d1 = await r1.json();
+    const fo = d1.fulfillment_orders?.find(f=>f.status==='open');
+    if(!fo) return false;
+
+    // 2. Kreiraj fulfillment
+    const r2 = await fetch(`https://softverzalampe.vercel.app/api/shopify?path=fulfillments.json`,{
+      method:'POST',
+      headers:{'X-Shopify-URL':url,'X-Shopify-Token':token,'Content-Type':'application/json'},
+      body: JSON.stringify({
+        fulfillment:{
+          line_items_by_fulfillment_order:[{
+            fulfillment_order_id: fo.id,
+            fulfillment_order_line_items: fo.line_items.map(li=>({id:li.id, quantity:li.remaining_quantity}))
+          }],
+          notify_customer: false
+        }
+      })
+    });
+    return r2.ok;
+  }catch(e){
+    console.log('Shopify fulfill error:', e);
+    return false;
+  }
+}
+
 async function markFulfilled(id){
   const o=DB.orders.find(x=>x.id===id);
   if(!o) return;
+
   // Deduct lager
   for(const it of (o.items||[])){
     await deductLager('gotove',it.qty||1,it.productId||it.product_id);
@@ -1322,7 +1361,15 @@ async function markFulfilled(id){
   await deductLager('karton',1);
   o.status='fulfilled'; o.fulfilled_at=new Date().toISOString();
   await sb.update('orders','id=eq.'+id,{status:'fulfilled',fulfilled_at:o.fulfilled_at});
-  renderOrds();renderDash();toast('✓ Fulfilled! Lampa sklopljena sa lagera.');
+
+  // Pokusaj da fulfilled na Shopify
+  let shopifyOk = false;
+  if(o.shopify_id && DB.settings.shopUrl && DB.settings.shopToken){
+    shopifyOk = await fulfillOnShopify(o.shopify_id);
+  }
+
+  renderOrds();renderDash();
+  toast(shopifyOk ? '✓ Poslato! Ažurirano i na Shopify.' : '✓ Oznaceno kao poslato (Shopify update nije uspeo)');
 }
 
 async function deleteOrder(id){

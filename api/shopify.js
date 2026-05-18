@@ -6,7 +6,7 @@ export default async function handler(req) {
       status: 200,
       headers: {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
         'Access-Control-Allow-Headers': 'x-shopify-url, x-shopify-token, content-type',
       }
     });
@@ -29,13 +29,27 @@ export default async function handler(req) {
   const shopifyUrl = `https://${shopUrl}/admin/api/2024-01/${path}?${url.searchParams.toString()}`;
 
   try {
-    const response = await fetch(shopifyUrl, {
+    const fetchOpts = {
+      method: req.method,
       headers: { 'X-Shopify-Access-Token': token, 'Content-Type': 'application/json' },
-    });
+    };
+
+    // Forward body for POST requests
+    if (req.method === 'POST') {
+      const body = await req.text();
+      if (body) fetchOpts.body = body;
+    }
+
+    const response = await fetch(shopifyUrl, fetchOpts);
     const data = await response.text();
+
     return new Response(data, {
       status: response.status,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      }
     });
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), {
