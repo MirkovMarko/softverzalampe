@@ -1144,8 +1144,9 @@ function renderLagComp(){
     html+=`<div style="margin-top:12px;padding-top:12px;border-top:0.5px solid var(--border)">`;
     html+=`<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Na putu 🚚</div>`;
     const names={usb:'USB kablovi',led:'LED traka',karton:'Kutije za pakovanje',lica:'Lica',kutije_stamp:'Kutije štampane'};
+    const globalTypes = ['usb','led','karton'];
     pending.forEach(inc=>{
-      const p = inc.product_id?getProdById(inc.product_id):null;
+      const p = (!globalTypes.includes(inc.type) && inc.product_id)?getProdById(inc.product_id):null;
       const lbl = (names[inc.type]||inc.type)+(p?' — '+p.name:'');
       html+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:0.5px solid var(--border)">
         <div>
@@ -1743,6 +1744,14 @@ async function deleteReturn(id){
 }
 
 // ===================== NARUČENO (NA PUTU) =====================
+function onIncTypeChange(){
+  const type = document.getElementById('inc-type').value;
+  const prodNeeded = ['lica','kutije_stamp'];
+  document.getElementById('inc-prod-wrap').style.display = prodNeeded.includes(type)?'':'none';
+  const units = {usb:'(kom)',led:'(m — metri)',karton:'(kom)',lica:'(kom)',kutije_stamp:'(kom)'};
+  document.getElementById('inc-unit').textContent = units[type]||'(kom)';
+}
+
 function openIncomingModal(){
   const sel = document.getElementById('inc-prod');
   sel.innerHTML = DB.products.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
@@ -1750,16 +1759,9 @@ function openIncomingModal(){
   document.getElementById('inc-total-price').value='';
   document.getElementById('inc-unit-price').value='';
   document.getElementById('inc-note').value='';
+  document.getElementById('inc-type').value='usb';
   onIncTypeChange();
   openModal('m-add-incoming');
-}
-
-function onIncTypeChange(){
-  const type = document.getElementById('inc-type').value;
-  const prodNeeded = ['lica','kutije_stamp'];
-  document.getElementById('inc-prod-wrap').style.display = prodNeeded.includes(type)?'':'none';
-  const units = {usb:'(kom)',led:'(m — metri)',karton:'(kom)',lica:'(kom)',kutije_stamp:'(kom)'};
-  document.getElementById('inc-unit').textContent = units[type]||'(kom)';
 }
 
 function calcUnitPrice(){
@@ -1775,7 +1777,9 @@ async function saveIncoming(){
   const totalPrice = parseFloat(document.getElementById('inc-total-price').value)||0;
   const unitPrice = parseFloat(document.getElementById('inc-unit-price').value)||0;
   const note = document.getElementById('inc-note').value;
-  const prodId = document.getElementById('inc-prod').value||null;
+  const globalTypes = ['usb','led','karton'];
+  // Globalne komponente nemaju product_id
+  const prodId = globalTypes.includes(type) ? null : (document.getElementById('inc-prod').value||null);
   if(!qty){toast('Unesi količinu');return;}
 
   const inc = {id:uid(), type, product_id:prodId, qty, total_price:totalPrice, unit_price:unitPrice, ordered_at:today(), arrived:false, note};
