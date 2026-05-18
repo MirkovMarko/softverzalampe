@@ -845,15 +845,24 @@ function renderProdPlan(){
     // Koliko može odmah da se pošalje
     const canSendNow = Math.min(gotove, needed);
     // Koliko može da se sklopi iz gotovih delova
-    const canAssemble = Math.min(sklopljene, lica);
-    // Koliko još fali
+    // Koliko jos fali do gotovih
     const stillNeeded = Math.max(0, needed - gotove);
-    // Koliko kutija treba da se odštampa
-    const printKutije = Math.max(0, stillNeeded - sklopljene);
-    const printLica = Math.max(0, stillNeeded - lica);
-    // Koliko USB/LED fali
-    const needUsb = Math.max(0, stillNeeded * usbPerLamp - usb);
-    const needLed = Math.max(0, stillNeeded * ledPerLamp - led);
+    // Koliko mogu da sklopim od stampanih kutija (kutija + kabl + LED)
+    const canSklopi = Math.min(kutije, Math.floor(usb/usbPerLamp), Math.floor(led/ledPerLamp));
+    // Koliko mogu da zalepim (sklopljene + lice)
+    const canAssemble = Math.min(sklopljene, lica);
+    // Koliko kutija treba da se odštampa (tek kad nema ni stampanih ni sklopljenih)
+    const availableKutije = sklopljene + kutije; // sklopljene + stampane
+    const printKutije = Math.max(0, stillNeeded - availableKutije);
+    // Koliko lica treba da se odštampa
+    const availableLica = lica; // lica na lageru
+    const printLica = Math.max(0, stillNeeded - availableLica);
+    // Koliko USB/LED fali za sklapanje onog sto fali
+    const needToSklop = Math.max(0, stillNeeded - sklopljene - gotove);
+    const needUsb = Math.max(0, needToSklop * usbPerLamp - usb);
+    const needLed = Math.max(0, needToSklop * ledPerLamp - led);
+    // Koliko treba da sklopim od stampanih kutija
+    const shouldSklopi = Math.min(canSklopi, Math.max(0, stillNeeded - sklopljene));
 
     const statusColor = gotove>=needed ? 'var(--green)' : sklopljene>0||lica>0 ? 'var(--warn)' : 'var(--red)';
     const statusIcon = gotove>=needed ? '✅' : '🔧';
@@ -889,8 +898,9 @@ function renderProdPlan(){
 
     // Akcije koje treba uraditi
     const actions = [];
-    if(canSendNow > 0 && gotove >= needed) actions.push(`<div class="alert ok" style="margin:4px 0;padding:8px 12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg><span>Spremi za slanje — imaš dovoljno gotovih lampi!</span></div>`);
-    if(canAssemble > 0 && gotove < needed) actions.push(`<div class="alert warn" style="margin:4px 0;padding:8px 12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Zalepi lice na ${canAssemble} sklopljenih kutija → gotove lampe</span></div>`);
+    if(gotove >= needed) actions.push(`<div class="alert ok" style="margin:4px 0;padding:8px 12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg><span>Spremi za slanje — imaš dovoljno gotovih lampi!</span></div>`);
+    if(canAssemble > 0 && gotove < needed) actions.push(`<div class="alert warn" style="margin:4px 0;padding:8px 12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Zalepi lice na <strong>${canAssemble} sklopljenih</strong> → gotove lampe</span></div>`);
+    if(shouldSklopi > 0) actions.push(`<div class="alert warn" style="margin:4px 0;padding:8px 12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Sklopi <strong>${shouldSklopi} kutija</strong> (imaš ${kutije} štampanih)</span></div>`);
     if(printKutije > 0) actions.push(`<div class="alert info" style="margin:4px 0;padding:8px 12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14"><rect x="2" y="3" width="20" height="14" rx="2"/></svg><span>Odštampaj još <strong>${printKutije} kutija</strong></span></div>`);
     if(printLica > 0) actions.push(`<div class="alert info" style="margin:4px 0;padding:8px 12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14"><rect x="2" y="3" width="20" height="14" rx="2"/></svg><span>Odštampaj još <strong>${printLica} lica</strong></span></div>`);
     if(needUsb > 0) actions.push(`<div class="alert danger" style="margin:4px 0;padding:8px 12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="14" height="14"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Nedostaje <strong>${needUsb} USB kablova</strong>!</span></div>`);
