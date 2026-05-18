@@ -305,6 +305,14 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
   <div class="sec-lbl">Limiti upozorenja</div>
   <div id="comp-limits-list"></div>
 
+  <div class="sec-lbl">Lager</div>
+  <div class="card">
+    <div class="switch-row">
+      <div><div class="switch-label">Režim direktnog uređivanja</div><div class="switch-sub">Omogući direktno menjanje količina u lageru</div></div>
+      <button class="switch" id="lager-edit-switch" onclick="toggleLagerEdit()"></button>
+    </div>
+  </div>
+
   <div class="sec-lbl">Reset podataka</div>
   <div class="card">
     <div style="font-size:13px;color:var(--text2);margin-bottom:14px">Briše sve podatke iz te kategorije — nepovratno!</div>
@@ -626,9 +634,9 @@ async function loadAll(){
   });
 
   // Settings
-  DB.settings = {filamentPrice:2000,postarina:390,shopUrl:'',shopToken:'',metaToken:'',metaAccount:'',metaAuto:false};
+  DB.settings = {filamentPrice:2000,postarina:390,shopUrl:'',shopToken:'',metaToken:'',metaAccount:'',metaAuto:false,lagerEditMode:false};
   (settingsRows||[]).forEach(r=>{
-    if(r.key==='metaAuto') DB.settings[r.key] = r.value==='true';
+    if(r.key==='metaAuto'||r.key==='lagerEditMode') DB.settings[r.key] = r.value==='true';
     else if(['filamentPrice','postarina'].includes(r.key)) DB.settings[r.key] = parseFloat(r.value)||0;
     else DB.settings[r.key] = r.value;
   });
@@ -1097,13 +1105,28 @@ function incomingQty(type, prodId){
   return getIncomingByType(type,prodId).reduce((a,b)=>a+(b.qty||0),0);
 }
 
+function lagEditInput(key, val, unit){
+  return `<input type="number" data-lager-key="${key}" value="${val}" step="0.1" style="width:70px;padding:4px 8px;border:1px solid var(--green);border-radius:var(--rxs);font-size:16px;font-weight:700;text-align:right;background:var(--green-bg);color:var(--green-dark)"> <span style="font-size:11px;color:var(--text3)">${unit}</span>`;
+}
+
 function renderLagComp(){
+  const editMode = getLagerEditMode();
   const usb=DB.lager.usb||0,led=DB.lager.led||0,karton=DB.lager.karton||0;
   const ul=DB.compLimits?.usb||20,ll=DB.compLimits?.led||20,kl=DB.compLimits?.karton||10;
   const usbInc=incomingQty('usb'),ledInc=incomingQty('led'),kartonInc=incomingQty('karton');
 
-  let html=`<div class="card" style="padding:12px 16px"><div class="card-hdr"><span class="card-title">Sirovine</span><div style="display:flex;gap:6px"><button class="btn xs" onclick="openIncomingModal()">+ Naručio sam</button><button class="btn xs" onclick="openModal('m-add-comp')">+ Stiglo</button></div></div>`;
-  html+=compRowHTMLInc('USB kablovi',usb,'kom',ul,usbInc)+compRowHTMLInc('LED traka',led,'m',ll,ledInc)+compRowHTMLInc('Kutije za pakovanje',karton,'kom',kl,kartonInc);
+  let html=`<div class="card" style="padding:12px 16px"><div class="card-hdr"><span class="card-title">Sirovine ${editMode?'✏️':''}</span><div style="display:flex;gap:6px">`;
+  if(editMode) html+=`<button class="btn xs primary" onclick="saveLagerEdit()">💾 Sačuvaj</button>`;
+  html+=`<button class="btn xs" onclick="openIncomingModal()">+ Naručio sam</button><button class="btn xs" onclick="openModal('m-add-comp')">+ Stiglo</button></div></div>`;
+
+  if(editMode){
+    // Editabilni prikaz
+    html+=`<div class="comp-row"><div class="comp-left"><div class="comp-name">USB kablovi</div></div><div class="comp-right">${lagEditInput('usb',usb,'kom')}</div></div>`;
+    html+=`<div class="comp-row"><div class="comp-left"><div class="comp-name">LED traka</div></div><div class="comp-right">${lagEditInput('led',led,'m')}</div></div>`;
+    html+=`<div class="comp-row"><div class="comp-left"><div class="comp-name">Kutije za pakovanje</div></div><div class="comp-right">${lagEditInput('karton',karton,'kom')}</div></div>`;
+  } else {
+    html+=compRowHTMLInc('USB kablovi',usb,'kom',ul,usbInc)+compRowHTMLInc('LED traka',led,'m',ll,ledInc)+compRowHTMLInc('Kutije za pakovanje',karton,'kom',kl,kartonInc);
+  }
 
   // Show pending incoming
   const pending = (DB.incoming||[]).filter(x=>!x.arrived);
@@ -1133,9 +1156,20 @@ function renderLagComp(){
     html+='<div class="card" style="padding:12px 16px"><div class="card-hdr"><span class="card-title">Po proizvodu</span></div>';
     DB.products.forEach(p=>{
       const lice=getLagerQty('lica',p.id),kut=getLagerQty('kutije_stamp',p.id),sklop=getLagerQty('sklopljene',p.id),gotova=getLagerQty('gotove',p.id);
-      html+=`<div style="border-bottom:0.5px solid var(--border);padding:12px 0"><div style="font-weight:600;font-size:14px;margin-bottom:8px">${p.name}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">`;
-      html+=miniStat('Lica',lice,'kom')+miniStat('Kutije stamp.',kut,'kom')+miniStat('Sklopljene',sklop,'kom')+miniStat('Gotove',gotova,'kom',true);
-      html+=`</div></div>`;
+      html+=`<div style="border-bottom:0.5px solid var(--border);padding:12px 0"><div style="font-weight:600;font-size:14px;margin-bottom:8px">${p.name}</div>`;
+      if(editMode){
+        html+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div style="background:var(--surface2);border-radius:var(--rs);padding:8px 10px"><div style="font-size:11px;color:var(--text3);margin-bottom:4px">Lica</div>${lagEditInput('lica::'+p.id,lice,'kom')}</div>
+          <div style="background:var(--surface2);border-radius:var(--rs);padding:8px 10px"><div style="font-size:11px;color:var(--text3);margin-bottom:4px">Kutije stamp.</div>${lagEditInput('kutije_stamp::'+p.id,kut,'kom')}</div>
+          <div style="background:var(--surface2);border-radius:var(--rs);padding:8px 10px"><div style="font-size:11px;color:var(--text3);margin-bottom:4px">Sklopljene</div>${lagEditInput('sklopljene::'+p.id,sklop,'kom')}</div>
+          <div style="background:var(--surface2);border-radius:var(--rs);padding:8px 10px"><div style="font-size:11px;color:var(--text3);margin-bottom:4px">Gotove</div>${lagEditInput('gotove::'+p.id,gotova,'kom')}</div>
+        </div>`;
+      } else {
+        html+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">`;
+        html+=miniStat('Lica',lice,'kom')+miniStat('Kutije stamp.',kut,'kom')+miniStat('Sklopljene',sklop,'kom')+miniStat('Gotove',gotova,'kom',true);
+        html+=`</div>`;
+      }
+      html+=`</div>`;
     });
     html+='</div>';
   }
@@ -1542,6 +1576,8 @@ async function doSync(){
 // ===================== SETTINGS =====================
 function renderSet(){
   const s=DB.settings;
+  const sw2=document.getElementById('lager-edit-switch');
+  if(sw2) getLagerEditMode()?sw2.classList.add('on'):sw2.classList.remove('on');
   document.getElementById('set-shop-url').value=s.shopUrl||'';
   document.getElementById('set-shop-token').value=s.shopToken||'';
   document.getElementById('set-meta-token').value=s.metaToken||'';
@@ -1786,6 +1822,37 @@ async function deleteIncoming(id){
   await sb.delete('incoming','id=eq.'+id);
   DB.incoming = DB.incoming.filter(x=>x.id!==id);
   renderLag();
+}
+
+// ===================== LAGER EDIT MODE =====================
+function getLagerEditMode(){
+  return DB.settings.lagerEditMode === 'true' || DB.settings.lagerEditMode === true;
+}
+
+function toggleLagerEdit(){
+  const current = getLagerEditMode();
+  DB.settings.lagerEditMode = !current;
+  sb.upsert('settings',[{key:'lagerEditMode',value:String(!current)}]);
+  const sw = document.getElementById('lager-edit-switch');
+  if(sw) !current ? sw.classList.add('on') : sw.classList.remove('on');
+  renderLag();
+  toast(!current ? '✏️ Edit mode uključen — možeš direktno menjati lager' : '🔒 Edit mode isključen');
+}
+
+async function saveLagerEdit(){
+  // Read all input values and save to Supabase
+  const inputs = document.querySelectorAll('[data-lager-key]');
+  for(const inp of inputs){
+    const key = inp.dataset.lagerKey;
+    const val = parseFloat(inp.value)||0;
+    await sb.upsert('lager',[{key, value:val}]);
+    // Update local DB
+    const [type, prodId] = key.split('::');
+    if(prodId) { if(!DB.lager[type]) DB.lager[type]={}; DB.lager[type][prodId]=val; }
+    else DB.lager[type]=val;
+  }
+  renderLag();renderDash();
+  toast('✓ Lager sačuvan!');
 }
 
 // ===================== RESET =====================
