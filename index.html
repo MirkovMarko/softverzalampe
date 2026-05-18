@@ -874,40 +874,116 @@ function initNotifications(){
   }
 }
 
-// ===================== STATISTIKA PO DANIMA =====================
+// ===================== STATISTIKA =====================
+const QUOTES = [
+  "Svaki veliki biznis počeo je sa jednom narudžbinom. 🚀",
+  "Uspeh nije slučajnost — to je rad, istrajnost i učenje iz greške. 💪",
+  "Ne takmičiš se sa drugima. Takmičiš se sa juče sobom. 📈",
+  "Malo po malo, i ovca vunu nosi. Svaka lampa se računa! 💡",
+  "Tvoj brand raste jer daješ vrednost. Nastavi tako! ⭐",
+  "Nije bitno koliko sporo ideš, dok se ne zaustavljaš. 🏃",
+  "Danas je odličan dan da budeš bolji nego juče. 💥",
+  "Svaka vraćena lampa je lekcija. Svaka prodata je pobeda! 🏆",
+  "Preduzetnik: neko ko radi 80 sati nedeljno da ne bi radio 40. 😄",
+  "Lager pun = mirna glava. Narudžbine stigle = srce puno! ❤️",
+];
+
 function renderDashStatsExtra(){
   const el = document.getElementById('dash-stats-extra');
   if(!el) return;
   const now = new Date();
+  const nowM = now.getMonth(), nowY = now.getFullYear();
+
   const mOrds = DB.orders.filter(o=>{
     const d = new Date(o.created_at);
-    return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear()&&o.status!=='cancelled';
+    return d.getMonth()===nowM && d.getFullYear()===nowY && o.status!=='cancelled';
   });
-  if(mOrds.length===0){el.innerHTML='';return;}
 
-  // Po danu u nedelji
-  const days = ['Ned','Pon','Uto','Sre','Čet','Pet','Sub'];
-  const byday = [0,0,0,0,0,0,0];
-  mOrds.forEach(o=>byday[new Date(o.created_at).getDay()]++);
-  const max = Math.max(...byday);
+  const mRets = (DB.returns||[]).filter(r=>{
+    const d = new Date(r.date);
+    return d.getMonth()===nowM && d.getFullYear()===nowY;
+  });
 
-  // Prosek po danu
-  const avg = (mOrds.length/now.getDate()).toFixed(1);
-  const best = days[byday.indexOf(max)];
+  const totalRets = mRets.reduce((a,b)=>a+(b.qty||1),0);
+  const fulfilled = mOrds.filter(o=>o.status==='fulfilled').length;
+  const pending = mOrds.filter(o=>o.status!=='fulfilled').length;
+  const postarinaTotal = fulfilled * (DB.settings.postarina||390);
 
-  let html = `<div class="card" style="margin-bottom:12px">
-    <div class="card-hdr"><span class="card-title">Narudžbine po danu</span><span style="font-size:12px;color:var(--text2)">${avg}/dan · Najbolji: ${best}</span></div>
-    <div style="display:flex;align-items:flex-end;gap:6px;height:60px;margin-bottom:4px">`;
-  days.forEach((d,i)=>{
-    const h = max>0?(byday[i]/max)*56:0;
-    const isToday = i===now.getDay();
-    html+=`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
-      <div style="font-size:10px;font-weight:600;color:var(--text2)">${byday[i]||''}</div>
-      <div style="width:100%;background:${isToday?'var(--green)':'var(--surface2)'};border-radius:3px;height:${Math.max(h,byday[i]>0?4:0)}px;min-height:${byday[i]>0?4:0}px;transition:height .3s"></div>
-      <div style="font-size:10px;color:${isToday?'var(--green)':'var(--text3)'};font-weight:${isToday?700:400}">${d}</div>
+  // Bar chart - po datumu (zadnjih 14 dana)
+  const byDate = {};
+  for(let i=13;i>=0;i--){
+    const d = new Date(now);
+    d.setDate(d.getDate()-i);
+    byDate[d.toISOString().slice(0,10)] = 0;
+  }
+  mOrds.forEach(o=>{
+    const d = o.created_at?.slice(0,10);
+    if(d && byDate[d]!==undefined) byDate[d]++;
+  });
+
+  const dates = Object.keys(byDate);
+  const vals = Object.values(byDate);
+  const maxVal = Math.max(...vals,1);
+  const todayStr = now.toISOString().slice(0,10);
+  const yesterdayStr = new Date(now.getTime()-86400000).toISOString().slice(0,10);
+
+  // Random motivacioni citat
+  const quote = QUOTES[Math.floor(Math.random()*QUOTES.length)];
+
+  let html = '';
+
+  // Motivacioni citat
+  html += `<div class="card" style="margin-bottom:12px;background:linear-gradient(135deg,var(--green-bg),var(--surface))">
+    <div style="font-size:13px;color:var(--green-dark);font-style:italic;line-height:1.5">${quote}</div>
+  </div>`;
+
+  // Mesečna statistika
+  html += `<div class="card" style="margin-bottom:12px">
+    <div class="card-hdr"><span class="card-title">Mesec u brojkama</span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px">
+      <div style="background:var(--surface2);border-radius:var(--rs);padding:10px 12px">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:3px">Ukupno naručeno</div>
+        <div style="font-size:22px;font-weight:700">${mOrds.length} <span style="font-size:13px;color:var(--text2)">kom</span></div>
+      </div>
+      <div style="background:var(--surface2);border-radius:var(--rs);padding:10px 12px">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:3px">Preuzeto (dostavljeno)</div>
+        <div style="font-size:22px;font-weight:700;color:var(--green)">${fulfilled} <span style="font-size:13px;color:var(--text2)">kom</span></div>
+      </div>
+      <div style="background:var(--surface2);border-radius:var(--rs);padding:10px 12px">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:3px">Vraćeno</div>
+        <div style="font-size:22px;font-weight:700;color:var(--red)">${totalRets} <span style="font-size:13px;color:var(--text2)">kom</span></div>
+      </div>
+      <div style="background:var(--surface2);border-radius:var(--rs);padding:10px 12px">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:3px">Na čekanju</div>
+        <div style="font-size:22px;font-weight:700;color:var(--blue)">${pending} <span style="font-size:13px;color:var(--text2)">kom</span></div>
+      </div>
+    </div>
+    <div style="background:var(--warn-bg);border-radius:var(--rs);padding:10px 12px;margin-top:4px">
+      <div style="font-size:11px;color:var(--warn-dark);margin-bottom:2px">Faktura za poštarinu (procena)</div>
+      <div style="font-size:18px;font-weight:700;color:var(--warn)">${fmt(postarinaTotal)} RSD <span style="font-size:12px;font-weight:400;color:var(--warn-dark)">(${fulfilled} × ${DB.settings.postarina||390} RSD)</span></div>
+    </div>
+  </div>`;
+
+  // Bar chart zadnjih 14 dana
+  html += `<div class="card" style="margin-bottom:12px">
+    <div class="card-hdr"><span class="card-title">Zadnjih 14 dana</span><span style="font-size:12px;color:var(--text2)">${byDate[todayStr]||0} danas · ${byDate[yesterdayStr]||0} juče</span></div>
+    <div style="display:flex;align-items:flex-end;gap:3px;height:70px;margin-bottom:6px">`;
+
+  dates.forEach(d=>{
+    const v = byDate[d];
+    const h = Math.max((v/maxVal)*60, v>0?4:2);
+    const isToday = d===todayStr;
+    const isYest = d===yesterdayStr;
+    const day = new Date(d).getDate();
+    html+=`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+      <div style="font-size:9px;font-weight:600;color:${isToday?'var(--green)':isYest?'var(--blue)':'var(--text3)'}">${v||''}</div>
+      <div style="width:100%;background:${isToday?'var(--green)':isYest?'var(--blue)':'var(--surface2)'};border-radius:2px;height:${h}px;transition:height .3s"></div>
+      <div style="font-size:9px;color:${isToday?'var(--green)':'var(--text3)'};font-weight:${isToday?700:400}">${day}.</div>
     </div>`;
   });
+
   html += `</div></div>`;
+
   el.innerHTML = html;
 }
 
