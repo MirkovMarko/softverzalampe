@@ -730,6 +730,7 @@ function getMonthReturnsStats(month, year){
   // Prihod gubitak = cena lampe + postarina (ceo iznos koji kupac plati)
   const prihodLoss = rets.reduce((a,b)=>{
     const p=getProdById(b.product_id);
+    // Prihod gubitak = puna cena sa postarinom (koliko kupac plati)
     const price = p?(p.price||0)+postarina:0;
     return a+price*(b.qty||1);
   },0);
@@ -1468,7 +1469,7 @@ async function syncProducts(url, token){
   const shopifyProds = data.products||[];
   let added = 0;
   for(const sp of shopifyProds){
-    const shopifyPrice = parseFloat(sp.variants?.[0]?.price||0) - (DB.settings.postarina||390);
+    const shopifyPrice = parseFloat(sp.variants?.[0]?.price||0);
     const existing = DB.products.find(p=>p.shopify_id===String(sp.id));
     if(existing && Math.abs((existing.price||0)-shopifyPrice)>1){
       existing.price = shopifyPrice;
@@ -1479,7 +1480,7 @@ async function syncProducts(url, token){
         id: uid(),
         name: sp.title,
         shopify_id: String(sp.id),
-        price: parseFloat(sp.variants?.[0]?.price||0) - (DB.settings.postarina||390), // Cena bez poštarine
+        price: parseFloat(sp.variants?.[0]?.price||0), // Puna cena sa sajta
         filament_kut: 0,
         filament_lice: 0,
         led: 1,
@@ -1604,7 +1605,8 @@ function renderSet(){
     ?`<div class="alert info" style="margin-bottom:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg><span>Nema proizvoda. Dodaj prvi.</span></div>`
     :DB.products.map(p=>{
       const total = calcCostPerLamp(p);
-      const profit = (p.price||0) - total;
+      const postarina = DB.settings.postarina||390;
+      const profit = (p.price||0) - postarina - total;
       return`<div class="card" style="margin-bottom:8px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div style="font-weight:600">${p.name}</div><button class="btn xs" onclick="openEditProd('${p.id}')">Uredi</button></div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:12px"><div style="color:var(--text2)">Cena: <strong>${fmt(p.price)} RSD</strong></div><div style="color:var(--text2)">Trošak: <strong>${fmt(total)} RSD</strong></div><div style="color:var(--green)">Profit: <strong>${fmt(profit)} RSD</strong></div></div><div style="font-size:11px;color:var(--text3);margin-top:5px">Filament: ${(p.filament_kut||0)+(p.filament_lice||0)}g · LED: ${p.led||1}m · USB: ${p.usb_cost||0} RSD · LED: ${p.led_cost||0} RSD/m · Kutija: ${p.karton_cost||0} RSD</div></div>`;
     }).join('');
 
