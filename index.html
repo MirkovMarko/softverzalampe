@@ -181,6 +181,17 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
 
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 .screen.on{animation:fadeIn .2s ease}
+
+/* DARK MODE */
+body.dark{
+  --bg:#141413;--surface:#1E1E1C;--surface2:#272725;--surface3:#313130;
+  --text:#F0EFE9;--text2:#9E9D97;--text3:#5A5955;
+  --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);
+  --green-bg:#0A2E20;--green-dark:#5DCEA0;
+  --red-bg:#2E0F0A;--red-dark:#E88070;
+  --warn-bg:#2E1F00;--warn-dark:#DBA050;
+  --blue-bg:#0A1E35;--blue-dark:#70AAEE;
+}
 </style>
 </head>
 <body>
@@ -210,6 +221,8 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
   <div class="stats2" id="dash-stats"></div>
   <div class="sec-lbl">Produkcijski plan</div>
   <div id="dash-prod-plan"></div>
+  <div class="sec-lbl">Statistika ovog meseca</div>
+  <div id="dash-stats-extra"></div>
   <div class="sec-lbl">Lager — brzo</div>
   <div id="dash-lager-quick"></div>
 </div>
@@ -269,6 +282,18 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
 <!-- PODEŠAVANJA -->
 <div id="s-set" class="screen">
   <div class="ph"><div><div class="ph-title">Podešavanja</div></div></div>
+
+  <div class="sec-lbl">Izgled</div>
+  <div class="card">
+    <div class="switch-row">
+      <div><div class="switch-label">Dark mode</div><div class="switch-sub">Tamna tema</div></div>
+      <button class="switch" id="dark-mode-switch" onclick="toggleDarkMode()"></button>
+    </div>
+    <div class="switch-row">
+      <div><div class="switch-label">Notifikacije</div><div class="switch-sub">Upozorenja za nove narudžbine</div></div>
+      <button class="switch" id="notif-switch" onclick="toggleNotifications()"></button>
+    </div>
+  </div>
 
   <div class="sec-lbl">Shopify API</div>
   <div class="card">
@@ -800,6 +825,92 @@ function toast(msg,duration=2600){
   setTimeout(()=>t.classList.remove('show'),duration);
 }
 
+// ===================== DARK MODE =====================
+function toggleDarkMode(){
+  const isDark = document.body.classList.toggle('dark');
+  localStorage.setItem('darkMode', isDark);
+  const sw = document.getElementById('dark-mode-switch');
+  if(sw) isDark ? sw.classList.add('on') : sw.classList.remove('on');
+}
+
+function initDarkMode(){
+  const isDark = localStorage.getItem('darkMode') === 'true';
+  if(isDark) document.body.classList.add('dark');
+  const sw = document.getElementById('dark-mode-switch');
+  if(sw && isDark) sw.classList.add('on');
+}
+
+// ===================== NOTIFIKACIJE =====================
+function toggleNotifications(){
+  if(!('Notification' in window)){toast('Browser ne podržava notifikacije');return;}
+  if(Notification.permission==='granted'){
+    localStorage.setItem('notifications','false');
+    document.getElementById('notif-switch')?.classList.remove('on');
+    toast('Notifikacije isključene');
+  } else {
+    Notification.requestPermission().then(p=>{
+      if(p==='granted'){
+        localStorage.setItem('notifications','true');
+        document.getElementById('notif-switch')?.classList.add('on');
+        toast('✓ Notifikacije uključene!');
+        new Notification('3DM Lampe', {body:'Notifikacije su aktivne!', icon:'/favicon.ico'});
+      } else {
+        toast('Dozvola odbijena');
+      }
+    });
+  }
+}
+
+function sendNotification(title, body){
+  if(Notification.permission==='granted' && localStorage.getItem('notifications')!=='false'){
+    new Notification(title, {body, icon:'/favicon.ico'});
+  }
+}
+
+function initNotifications(){
+  const sw = document.getElementById('notif-switch');
+  if(sw && Notification.permission==='granted' && localStorage.getItem('notifications')!=='false'){
+    sw.classList.add('on');
+  }
+}
+
+// ===================== STATISTIKA PO DANIMA =====================
+function renderDashStatsExtra(){
+  const el = document.getElementById('dash-stats-extra');
+  if(!el) return;
+  const now = new Date();
+  const mOrds = DB.orders.filter(o=>{
+    const d = new Date(o.created_at);
+    return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear()&&o.status!=='cancelled';
+  });
+  if(mOrds.length===0){el.innerHTML='';return;}
+
+  // Po danu u nedelji
+  const days = ['Ned','Pon','Uto','Sre','Čet','Pet','Sub'];
+  const byday = [0,0,0,0,0,0,0];
+  mOrds.forEach(o=>byday[new Date(o.created_at).getDay()]++);
+  const max = Math.max(...byday);
+
+  // Prosek po danu
+  const avg = (mOrds.length/now.getDate()).toFixed(1);
+  const best = days[byday.indexOf(max)];
+
+  let html = `<div class="card" style="margin-bottom:12px">
+    <div class="card-hdr"><span class="card-title">Narudžbine po danu</span><span style="font-size:12px;color:var(--text2)">${avg}/dan · Najbolji: ${best}</span></div>
+    <div style="display:flex;align-items:flex-end;gap:6px;height:60px;margin-bottom:4px">`;
+  days.forEach((d,i)=>{
+    const h = max>0?(byday[i]/max)*56:0;
+    const isToday = i===now.getDay();
+    html+=`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+      <div style="font-size:10px;font-weight:600;color:var(--text2)">${byday[i]||''}</div>
+      <div style="width:100%;background:${isToday?'var(--green)':'var(--surface2)'};border-radius:3px;height:${Math.max(h,byday[i]>0?4:0)}px;min-height:${byday[i]>0?4:0}px;transition:height .3s"></div>
+      <div style="font-size:10px;color:${isToday?'var(--green)':'var(--text3)'};font-weight:${isToday?700:400}">${d}</div>
+    </div>`;
+  });
+  html += `</div></div>`;
+  el.innerHTML = html;
+}
+
 // ===================== PRODUKCIJSKI PLAN =====================
 function renderProdPlan(){
   const el = document.getElementById('dash-prod-plan');
@@ -946,6 +1057,7 @@ function renderDash(){
 
   // Production plan
   renderProdPlan();
+  renderDashStatsExtra();
 
   // Pending orders removed from dashboard
 
@@ -1581,6 +1693,7 @@ async function doSync(){
 
     renderDash();renderOrds();
     toast(`✓ Sync: ${added} novih, ${updated} ažurirano${cancelled>0?', '+cancelled+' cancelled obrisano':''}`);
+    if(added>0) sendNotification('3DM Lampe 🛍️', `${added} nova narudžbina!`);
   }catch(e){toast('❌ '+e.message);}
   btn.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="15" height="15"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg> Shopify`;btn.disabled=false;
 }
@@ -1590,6 +1703,10 @@ function renderSet(){
   const s=DB.settings;
   const sw2=document.getElementById('lager-edit-switch');
   if(sw2) getLagerEditMode()?sw2.classList.add('on'):sw2.classList.remove('on');
+  const dmSw=document.getElementById('dark-mode-switch');
+  if(dmSw) document.body.classList.contains('dark')?dmSw.classList.add('on'):dmSw.classList.remove('on');
+  const ntSw=document.getElementById('notif-switch');
+  if(ntSw&&Notification.permission==='granted'&&localStorage.getItem('notifications')!=='false') ntSw.classList.add('on');
   document.getElementById('set-shop-url').value=s.shopUrl||'';
   document.getElementById('set-shop-token').value=s.shopToken||'';
   document.getElementById('set-meta-token').value=s.metaToken||'';
@@ -1927,6 +2044,12 @@ function exportCSV(){
 // ===================== INIT =====================
 loadAll().then(()=>{
   document.getElementById('ord-items-list').innerHTML='';
+  initDarkMode();
+  initNotifications();
+  // Auto sync kad se stranica ucita
+  if(DB.settings.shopUrl && DB.settings.shopToken){
+    doSync().catch(e=>console.log('Auto sync error:', e));
+  }
 }).catch(err=>{
   console.error('Load error:', err);
   document.getElementById('loading-screen').style.display='none';
