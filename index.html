@@ -718,12 +718,21 @@ function getReturnedQtyForMonth(productId, month, year){
 function getMonthReturnsStats(month, year){
   const rets = (DB.returns||[]).filter(r=>{const d=new Date(r.date);return d.getMonth()===month&&d.getFullYear()===year;});
   const totalQty = rets.reduce((a,b)=>a+(b.qty||1),0);
-  const totalValue = rets.reduce((a,b)=>{
+  const postarina = DB.settings.postarina||390;
+  // Prihod gubitak = cena lampe + postarina (ceo iznos koji kupac plati)
+  const prihodLoss = rets.reduce((a,b)=>{
     const p=getProdById(b.product_id);
-    const price = p?(p.price||0)+(DB.settings.postarina||390):0;
+    const price = p?(p.price||0)+postarina:0;
     return a+price*(b.qty||1);
   },0);
-  return {totalQty, totalValue, rets};
+  // Profit gubitak = cena lampe - troskovi izrade (sta smo zaradili od te lampe)
+  const profitLoss = rets.reduce((a,b)=>{
+    const p=getProdById(b.product_id);
+    if(!p) return a;
+    const lampProfit = (p.price||0) - calcCostPerLamp(p);
+    return a+lampProfit*(b.qty||1);
+  },0);
+  return {totalQty, prihodLoss, profitLoss, rets};
 }
 
 function checkLagerAlerts(){
@@ -904,6 +913,9 @@ function renderDash(){
   const mOrds=DB.orders.filter(o=>{if(o.status==='cancelled'||o.cancel_reason) return false;const d=new Date(o.created_at);return d.getMonth()===nowM&&d.getFullYear()===nowY;});
   let prihod=0,profit=0;
   mOrds.forEach(o=>{const r=calcProfitPerOrder(o);prihod+=r.prihod;profit+=r.profit;});
+  const mRetStats=getMonthReturnsStats(nowM,nowY);
+  prihod -= mRetStats.prihodLoss;
+  profit -= mRetStats.profitLoss;
   const totalRekl=DB.reklame.filter(r=>{const d=new Date(r.date);return d.getMonth()===nowM&&d.getFullYear()===nowY;}).reduce((a,b)=>a+(b.amount||0),0);
   const finalProfit=profit-totalRekl;
   const pending=DB.orders.filter(o=>o.status!=='fulfilled');
@@ -1305,10 +1317,20 @@ function renderFin(){
   const finalProfit=totalProfit-totalRekl;
 
   const retStats2 = getMonthReturnsStats(mo,yr);
-  const realProfit = finalProfit - retStats2.totalValue;
+  // Prihod = sve narudzbine - vracene (cela cena sa postarinom)
+  const realPrihod = totalPrihod - retStats2.prihodLoss;
+  // Profit = profit od narudzbina - profit koji smo izgubili na vracenoj lampi
+  const realProfit = totalProfit - retStats2.profitLoss;
+  // Krajnji = profit - reklame
+  const krajnji = realProfit - totalRekl;
 
-  let html=`<div class="profit-big"><div><div class="profit-big-lbl">Krajnji profit</div><div style="font-size:13px;color:var(--green-mid)">profit − reklame − vraćene</div></div><div class="profit-big-val">${fmt(realProfit)} <span style="font-size:16px;color:var(--green-mid)">RSD</span></div></div>`;
-  html+=`<div class="stats2"><div class="stat-card"><div class="stat-lbl">Prihod</div><div class="stat-num">${fmt(totalPrihod)}<small> RSD</small></div></div><div class="stat-card"><div class="stat-lbl">Profit (bruto)</div><div class="stat-num green">${fmt(totalProfit)}<small> RSD</small></div></div><div class="stat-card"><div class="stat-lbl">Reklame</div><div class="stat-num red">−${fmt(totalRekl)}<small> RSD</small></div></div><div class="stat-card"><div class="stat-lbl">Narudžbine</div><div class="stat-num blue">${ords.length}<small> kom</small></div></div></div>`;
+  let html=`<div class="profit-big"><div><div class="profit-big-lbl">Krajnji profit</div><div style="font-size:13px;color:var(--green-mid)">profit − reklame − vraćene</div></div><div class="profit-big-val">${fmt(krajnji)} <span style="font-size:16px;color:var(--green-mid)">RSD</span></div></div>`;
+  html+=`<div class="stats2">
+    <div class="stat-card"><div class="stat-lbl">Prihod</div><div class="stat-num">${fmt(realPrihod)}<small> RSD</small></div>${retStats2.prihodLoss>0?`<div style="font-size:11px;color:var(--red)">−${fmt(retStats2.prihodLoss)} vraćeno</div>`:''}</div>
+    <div class="stat-card"><div class="stat-lbl">Profit (bruto)</div><div class="stat-num green">${fmt(realProfit)}<small> RSD</small></div>${retStats2.profitLoss>0?`<div style="font-size:11px;color:var(--red)">−${fmt(retStats2.profitLoss)} vraćeno</div>`:''}</div>
+    <div class="stat-card"><div class="stat-lbl">Reklame</div><div class="stat-num red">−${fmt(totalRekl)}<small> RSD</small></div></div>
+    <div class="stat-card"><div class="stat-lbl">Narudžbine</div><div class="stat-num blue">${ords.length}<small> kom</small></div></div>
+  </div>`;
 
   if(totalRekl>0){const roas=totalPrihod/totalRekl,cpa=totalRekl/Math.max(ords.length,1);html+=`<div class="card"><div class="card-hdr"><span class="card-title">Efikasnost reklama</span></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div><div style="font-size:12px;color:var(--text2);margin-bottom:3px">ROAS</div><div style="font-size:26px;font-weight:700;color:${roas>=3?'var(--green)':'var(--warn)'}">${roas.toFixed(2)}</div></div><div><div style="font-size:12px;color:var(--text2);margin-bottom:3px">CPA</div><div style="font-size:26px;font-weight:700;">${fmt(cpa)} <span style="font-size:14px;color:var(--text2)">RSD</span></div></div></div></div>`;}
 
@@ -1330,7 +1352,7 @@ function renderFin(){
   if(retStats.totalQty>0){
     html+=`<div class="alert warn" style="margin-bottom:14px">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      <span><strong>${retStats.totalQty} vraćenih lampi</strong> — oduzeto ${fmt(retStats.totalValue)} RSD od profita</span>
+      <span><strong>${retStats.totalQty} vraćenih lampi</strong> — prihod: −${fmt(retStats.prihodLoss)} RSD · profit: −${fmt(retStats.profitLoss)} RSD</span>
     </div>`;
   }
 
