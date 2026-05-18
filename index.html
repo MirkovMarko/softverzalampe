@@ -777,27 +777,80 @@ function checkLagerAlerts(){
   return alerts;
 }
 
-function getOrderReadiness(order){
+// Virtuelni lager - uzima u obzir rezervacije starijih narudzbina
+function buildVirtualLager(){
+  const vl = {
+    usb: getLagerQty('usb'),
+    led: getLagerQty('led'),
+    gotove: {}, sklopljene: {}, lica: {}, kutije_stamp: {}
+  };
+  DB.products.forEach(p=>{
+    vl.gotove[p.id] = getLagerQty('gotove', p.id);
+    vl.sklopljene[p.id] = getLagerQty('sklopljene', p.id);
+    vl.lica[p.id] = getLagerQty('lica', p.id);
+    vl.kutije_stamp[p.id] = getLagerQty('kutije_stamp', p.id);
+  });
+  return vl;
+}
+
+// Cache virtuelnog lagera - resetuje se pri svakom renderu
+let _vlCache = null;
+let _vlOrdersProcessed = [];
+
+function getVirtualLager(upToOrderId){
+  // Ako nije inicijalizovan ili nova sesija rendera
+  if(!_vlCache){
+    _vlCache = buildVirtualLager();
+    _vlOrdersProcessed = [];
+    // Rezervisi za sve "ready" narudzbine (vec oznacene kao spreman)
+    const readyOrds = DB.orders.filter(o=>o.status==='ready').sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+    readyOrds.forEach(o=>{
+      (o.items||[]).forEach(it=>{
+        const pid = it.productId||it.product_id;
+        if(_vlCache.gotove[pid]!==undefined) _vlCache.gotove[pid] = Math.max(0, (_vlCache.gotove[pid]||0) - (it.qty||1));
+      });
+      _vlOrdersProcessed.push(o.id);
+    });
+  }
+  return _vlCache;
+}
+
+function resetVirtualLager(){
+  _vlCache = null;
+  _vlOrdersProcessed = [];
+}
+
+function getOrderReadiness(order, vl){
+  // Ako nije prosleđen vl, koristi pravi lager (za pojedinačni prikaz)
+  const useVl = vl || null;
   const result={items:[],canFulfill:true,needsWork:false};
   (order.items||[]).forEach(it=>{
     const p=getProdById(it.productId||it.product_id);
+    const pid=it.productId||it.product_id;
     const pName=p?p.name:'?';
     const needed=it.qty||1;
-    const gotove=getLagerQty('gotove',it.productId||it.product_id);
-    const sklopljene=getLagerQty('sklopljene',it.productId||it.product_id);
-    const lica=getLagerQty('lica',it.productId||it.product_id);
-    const kutije=getLagerQty('kutije_stamp',it.productId||it.product_id);
-    const usb=getLagerQty('usb');
-    const led=getLagerQty('led');
+    const gotove = useVl ? (useVl.gotove[pid]||0) : getLagerQty('gotove',pid);
+    const sklopljene = useVl ? (useVl.sklopljene[pid]||0) : getLagerQty('sklopljene',pid);
+    const lica = useVl ? (useVl.lica[pid]||0) : getLagerQty('lica',pid);
+    const kutije = useVl ? (useVl.kutije_stamp[pid]||0) : getLagerQty('kutije_stamp',pid);
+    const usb = useVl ? useVl.usb : getLagerQty('usb');
+    const led = useVl ? useVl.led : getLagerQty('led');
     const ledN=(p?.led||1)*needed, usbN=(p?.usb||1)*needed;
     let status,hint,canDo=true;
     if(gotove>=needed){status='ready';hint=`${gotove} gotovih na lageru`;}
     else if(sklopljene>=needed&&lica>=needed){status='need_glue';hint=`Imaš ${sklopljene} sklopljenih + ${lica} lica — zalepi!`;result.needsWork=true;canDo=false;}
     else if(kutije>=needed&&usb>=usbN&&led>=ledN&&lica>=needed){status='need_assembly';hint='Imaš sve delove — sklopi i zalepi!';result.needsWork=true;canDo=false;}
     else{status='missing';hint='Fali materijal — provjeri lager';result.needsWork=true;canDo=false;}
-    result.items.push({pName,needed,status,hint,productId:it.productId||it.product_id,canDo});
+    result.items.push({pName,needed,status,hint,productId:pid,canDo});
     if(!canDo) result.canFulfill=false;
   });
+  // Ako može fulfill, rezerviši iz virtuelnog lagera
+  if(result.canFulfill && useVl){
+    (order.items||[]).forEach(it=>{
+      const pid=it.productId||it.product_id;
+      if(useVl.gotove[pid]!==undefined) useVl.gotove[pid] = Math.max(0,(useVl.gotove[pid]||0)-(it.qty||1));
+    });
+  }
   return result;
 }
 
@@ -1164,19 +1217,29 @@ function compRowHTML(name,qty,unit,limit){
 
 // ===================== ORDERS =====================
 function renderOrds(){
-  const all=DB.orders.filter(o=>o.status!=='fulfilled');
-  const ready=all.filter(o=>getOrderMaterialStatus(o)==='ready'||o.status==='ready');
-  const hasMaterial=all.filter(o=>getOrderMaterialStatus(o)==='has_material');
-  const missing=all.filter(o=>getOrderMaterialStatus(o)==='missing');
+  // Reset virtuelnog lagera za svaki render
+  resetVirtualLager();
+  const all = DB.orders.filter(o=>o.status!=='fulfilled')
+    .sort((a,b)=>new Date(a.created_at)-new Date(b.created_at)); // Najstarije prvo
+
+  const vl = getVirtualLager(); // Inicijalizuj virtuelni lager
+
+  // Klasifikuj koristeci virtuelni lager (po redu od najstarije)
+  const categorized = all.map(o=>{
+    const status = getOrderMaterialStatusVl(o, vl);
+    return {order:o, status};
+  });
+
+  const ready = categorized.filter(x=>x.status==='ready'||x.order.status==='ready').map(x=>x.order);
+  const hasMaterial = categorized.filter(x=>x.status==='has_material'&&x.order.status!=='ready').map(x=>x.order);
+  const missing = categorized.filter(x=>x.status==='missing'&&x.order.status!=='ready').map(x=>x.order);
 
   let show;
   if(ordFilter==='ready') show=ready;
   else if(ordFilter==='has_material') show=hasMaterial;
   else if(ordFilter==='missing') show=missing;
-  else{
-    // All - sort: ready first, then has_material, then missing
-    show=[...ready,...hasMaterial,...missing];
-  }
+  else show=[...ready,...hasMaterial,...missing];
+
   document.getElementById('ord-sub').textContent=`✅ ${ready.length} · 🟡 ${hasMaterial.length} · 🔴 ${missing.length}`;
   document.getElementById('ord-list').innerHTML=show.length===0
     ?`<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg><p>Nema narudžbina</p></div>`
@@ -1186,9 +1249,28 @@ function renderOrds(){
 function filterOrds(f,el){ordFilter=f;document.querySelectorAll('#s-ord .tab').forEach(t=>t.classList.remove('on'));el.classList.add('on');renderOrds();}
 
 function getOrderMaterialStatus(order){
-  const r=getOrderReadiness(order);
+  const r=getOrderReadiness(order, null);
   if(order.status==='ready') return 'ready';
   if(r.canFulfill) return 'ready';
+  const allHaveSomething = r.items.every(i=>i.status==='need_glue'||i.status==='need_assembly'||i.status==='ready');
+  if(allHaveSomething) return 'has_material';
+  return 'missing';
+}
+
+function getOrderMaterialStatusVl(order, vl){
+  if(order.status==='ready') return 'ready';
+  // Koristi kopiju vl da ne bi uticalo na ostale pre odluke
+  const vlCopy = {
+    usb: vl.usb, led: vl.led,
+    gotove: {...vl.gotove}, sklopljene: {...vl.sklopljene},
+    lica: {...vl.lica}, kutije_stamp: {...vl.kutije_stamp}
+  };
+  const r = getOrderReadiness(order, vlCopy);
+  if(r.canFulfill){
+    // Stvarno rezervisi iz originalnog vl
+    getOrderReadiness(order, vl);
+    return 'ready';
+  }
   const allHaveSomething = r.items.every(i=>i.status==='need_glue'||i.status==='need_assembly'||i.status==='ready');
   if(allHaveSomething) return 'has_material';
   return 'missing';
